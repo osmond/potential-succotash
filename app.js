@@ -189,7 +189,10 @@
           hli.className = 'group-header';
           hli.dataset.day = dayKey;
           const date = new Date(dayKey+'T00:00:00');
-          hli.textContent = date.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+          const dDelta = daysBetween(today, date);
+          const label = dDelta===1 ? 'Tomorrow' : `In ${dDelta} days`;
+          const suffix = date.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+          hli.textContent = `${label} (${suffix})`;
           upHost.appendChild(hli);
         }
         const li = document.createElement('li'); li.innerHTML = taskCardHTML(it); bindTaskCard(li, it); upHost.appendChild(li);
@@ -202,16 +205,17 @@
     const rel = humanDue(it.due);
     const p = it.plant;
     const vol = waterPill(p);
+    const icon = taskIcon(it.type);
     return `
-      <article class="plant-card">
-        <div class="header">
+      <article class="rounded-xl border p-3 bg-[color:var(--panel)] border-[color:var(--border)] flex flex-col gap-2">
+        <div class="flex items-start justify-between gap-2">
           <div>
-            <div class="name">${escapeHtml(it.title)}</div>
-            <div class="species">${escapeHtml(taxonLine(p))}</div>
+            <div class="font-semibold">${icon} ${escapeHtml(it.title)}</div>
+            <div class="species text-sm text-[color:var(--muted)]">${escapeHtml(taxonLine(p))}</div>
           </div>
           <div class="pill ${badge}">${escapeHtml(rel)}</div>
         </div>
-        <div class="stats">
+        <div class="flex flex-wrap gap-2 items-center">
           ${it.type==='water' ? vol : `<span class="pill">every ${it.task.everyDays}d</span>`}
         </div>
         <div class="actions-row">
@@ -317,22 +321,22 @@
     const wx = wxPill(p);
     const volPill = waterPill(p);
     return `
-      <article class="plant-card">
-        <div class="cover"></div>
-        <div class="header">
+      <article class="rounded-xl border p-3 bg-[color:var(--panel)] border-[color:var(--border)] flex flex-col gap-2">
+        <div class="w-full aspect-video rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] cover"></div>
+        <div class="flex items-start justify-between gap-2">
           <div>
-            <div class="name">${escapeHtml(p.name || 'Untitled')}</div>
-            <div class="species">${escapeHtml(taxonLine(p))}</div>
+            <div class="name font-semibold">${escapeHtml(p.name || 'Untitled')}</div>
+            <div class="species text-sm text-[color:var(--muted)]">${escapeHtml(taxonLine(p))}</div>
           </div>
           <div class="pill ${badge}">${escapeHtml(dueTxt)}</div>
         </div>
-        <div class="stats">
+        <div class="flex flex-wrap gap-2 items-center">
           <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
           ${envChip(p)}
           ${wx}
           ${volPill}
         </div>
-        <div class="thumbs"></div>
+        <div class="thumbs flex gap-1"></div>
         <div class="actions-row">
           <button class="btn small" data-action="water">Watered</button>
           <input type="file" accept="image/*" capture="environment" data-snap hidden />
