@@ -100,10 +100,23 @@
     Array.from(list.children).forEach(li => {
       try{ (JSON.parse(li.dataset.urls||'[]')).forEach(u => URL.revokeObjectURL(u)); }catch{}
     });
-    const openBtn = root.querySelector('[data-action="open"]');
-    if(openBtn) openBtn.addEventListener('click', () => navigateToPlant(plant.id));
     list.innerHTML = '';
     const plants = await PlantDB.all();
+    await renderTasks(plants);
+    // Empty state
+    const oldEmpty = document.getElementById('emptyState');
+    if(oldEmpty) oldEmpty.remove();
+    if(!plants.length){
+      const empty = document.createElement('div');
+      empty.id = 'emptyState';
+      empty.className = 'card';
+      empty.style.margin = '12px 0';
+      empty.innerHTML = '<div style="display:flex; align-items:center; gap:.5rem; justify-content:space-between"><div><strong>No plants yet.</strong><div class="muted">Use Add Plant or Add Demo to get started.</div></div><div><button id="emptySeed" class="btn">Add Demo</button></div></div>';
+      list.parentElement.insertBefore(empty, list);
+      const btn = document.getElementById('emptySeed');
+      if(btn) btn.onclick = () => document.getElementById('seedBtn')?.click();
+      return;
+    }
     plants.forEach(p => {
       p.nextDue = nextDueFrom(p);
       (p.tasks||[]).forEach(t => t.nextDue = nextTaskDue(t, t.lastDone || p.lastWatered));
@@ -116,6 +129,78 @@
       list.appendChild(li);
       enrichCardWithMedia(li, plant);
     }
+  }
+
+  async function renderTasks(plants){
+    const dueHost = document.getElementById('dueList');
+    const upHost = document.getElementById('upcomingList');
+    if(!dueHost || !upHost) return;
+    dueHost.innerHTML = '';
+    upHost.innerHTML = '';
+    const items = [];
+    const today = new Date();
+    for(const p of plants){
+      // Watering as a task
+      const waterDue = nextDueFrom(p);
+      const d = parseDate(waterDue);
+      const delta = daysBetween(today, d);
+      items.push({ plant:p, type:'water', title:`Water ${p.name||''}`.trim(), due: waterDue, delta });
+      // Other tasks
+      (p.tasks||[]).forEach(t => {
+        const tdue = nextTaskDue(t, t.lastDone || p.lastWatered);
+        if(tdue){
+          const dt = daysBetween(today, parseDate(tdue));
+          items.push({ plant:p, type:t.type, task:t, title:`${capitalize(t.type)} ${p.name||''}`.trim(), due: tdue, delta: dt });
+        }
+      });
+    }
+    items.sort((a,b) => a.due.localeCompare(b.due));
+    for(const it of items){
+      const li = document.createElement('li');
+      li.innerHTML = taskCardHTML(it);
+      bindTaskCard(li, it);
+      if(it.delta <= 0) dueHost.appendChild(li); else if(it.delta <= 7) upHost.appendChild(li);
+    }
+  }
+
+  function taskCardHTML(it){
+    const badge = dueClass(it.due);
+    const rel = humanDue(it.due);
+    const p = it.plant;
+    const vol = waterPill(p);
+    return `
+      <article class="plant-card">
+        <div class="header">
+          <div>
+            <div class="name">${escapeHtml(it.title)}</div>
+            <div class="species">${escapeHtml(taxonLine(p))}</div>
+          </div>
+          <div class="pill ${badge}">${escapeHtml(rel)}</div>
+        </div>
+        <div class="stats">
+          ${it.type==='water' ? vol : `<span class="pill">every ${it.task.everyDays}d</span>`}
+        </div>
+        <div class="actions-row">
+          <button class="btn small" data-action="done">Done</button>
+          <button class="btn small" data-action="open">Open</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function bindTaskCard(root, it){
+    root.querySelector('[data-action="done"]').addEventListener('click', async () => {
+      if(it.type==='water'){
+        it.plant.lastWatered = todayISO();
+        it.plant.history = it.plant.history||[]; it.plant.history.push({type:'water', at: todayISO()});
+      }else{
+        it.task.lastDone = todayISO();
+        it.plant.history = it.plant.history||[]; it.plant.history.push({type:`task:${it.type}`, at: todayISO()});
+      }
+      await PlantDB.put(it.plant);
+      renderList();
+    });
+    root.querySelector('[data-action="open"]').addEventListener('click', () => navigateToPlant(it.plant.id));
   }
 
   async function enrichCardWithMedia(root, plant){
@@ -167,6 +252,7 @@
         </div>
         <div class="stats">
           <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
+          ${envChip(p)}
           ${wx}
           ${volPill}
         </div>
@@ -277,6 +363,32 @@
       renderTaxoSuggestions(suggestions);
     }catch(err){ alert('Suggestion failed'); }
   });
+
+  // Smart defaults based on name/genus/species
+  ;['plantName','plantGenus','plantSpecies'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.addEventListener('input', applySmartDefaults);
+  });
+  function applySmartDefaults(){
+    const name = document.getElementById('plantName').value.toLowerCase();
+    const genus = document.getElementById('plantGenus').value.toLowerCase();
+    const species = document.getElementById('plantSpecies').value.toLowerCase();
+    const hint = `${genus} ${species} ${name}`;
+    const setIfEmpty = (id, val) => { const el = document.getElementById(id); if(el && (!el.value || el.value===el.getAttribute('placeholder'))) el.value = val; };
+    // Heuristics
+    if(/(aloe|echeveria|haworth|crassula|sedum|opuntia|cactus|succulent|sansevieria|trifasciata|snake)/.test(hint)){
+      setIfEmpty('soilType','cactus'); setIfEmpty('lightLevel','high'); setIfEmpty('baseInterval', 12);
+    }else if(/(monstera|philodendron|anthurium|epipremnum|pothos|syngonium|aroid)/.test(hint)){
+      setIfEmpty('soilType','aroid'); setIfEmpty('lightLevel','medium'); setIfEmpty('baseInterval', 7);
+    }else if(/(fern|nephrolepis|pteris|blechnum)/.test(hint)){
+      setIfEmpty('soilType','generic'); setIfEmpty('lightLevel','low'); setIfEmpty('baseInterval', 4);
+    }else if(/(ficus|lyrata|rubber)/.test(hint)){
+      setIfEmpty('soilType','aroid'); setIfEmpty('lightLevel','high'); setIfEmpty('baseInterval', 6);
+    }else if(/(zamioculcas|zz\s*plant)/.test(hint)){
+      setIfEmpty('soilType','generic'); setIfEmpty('lightLevel','low'); setIfEmpty('baseInterval', 12);
+    }
+    // Reasonable pot default
+    setIfEmpty('potDiameter', 6);
+  }
 
   // Update GBIF/Wikipedia links when taxon fields change
   // Removed external GBIF/Wikipedia buttons for a cleaner flow.
@@ -707,6 +819,12 @@
     const parts = [soil, where, exp].filter(Boolean).join(' • ');
     const tuneStr = tunes.length ? ` • ${tunes.join(' ')}` : '';
     return (parts || '—') + tuneStr;
+  }
+  function envChip(p){
+    const soil = p.soilType === 'cactus' ? 'cactus' : (p.soilType === 'aroid' ? 'aroid' : 'soil');
+    const where = p.inout === 'outdoor' ? 'out' : 'in';
+    const exp = p.exposure || '';
+    return `<span class="pill" title="Environment">${soil} • ${where}${exp?(' • '+exp):''}</span>`;
   }
 
   // Weather pill in Details header
