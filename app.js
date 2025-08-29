@@ -223,6 +223,16 @@
   // Form handling
   $('#addPlantBtn').addEventListener('click', () => views.showEditor(null));
   $('#cancelEdit').addEventListener('click', () => views.showDashboard());
+  // Seed demo data
+  const seedBtn = document.getElementById('seedBtn');
+  if(seedBtn){
+    seedBtn.addEventListener('click', async () => {
+      const demo = makeDemoPlants();
+      for(const p of demo){ await PlantDB.put(p); }
+      renderList();
+      alert('Added demo plants');
+    });
+  }
 
   $('#plantForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -996,6 +1006,26 @@
   function cryptoRandomId(){
     if(window.crypto?.randomUUID) return crypto.randomUUID();
     return 'id-' + Math.random().toString(16).slice(2) + '-' + Date.now().toString(16);
+  }
+
+  function makeDemoPlants(){
+    const today = todayISO();
+    const mk = (id, name, tax, light, potSize, potIn, soil, inout, exposure, baseDays) => ({
+      id, name,
+      family: tax.family, genus: tax.genus, species: tax.species, cultivar: tax.cultivar||'',
+      lightLevel: light, potSize, potDiameterIn: potIn,
+      soilType: soil, inout, exposure, roomLabel: '',
+      baseIntervalDays: baseDays, tuneIntervalPct: 0, tuneVolumePct: 0,
+      lastWatered: today, notes: '', tasks: [ {type:'fertilize', everyDays:30}, {type:'inspect', everyDays:14} ],
+      observations: [], history: [{type:'water', at: today}],
+    });
+    return [
+      mk(cryptoRandomId(), 'Monstera', {family:'Araceae',genus:'Monstera',species:'deliciosa'}, 'medium', 'large', 10, 'aroid', 'indoor', 'E', 7),
+      mk(cryptoRandomId(), 'ZZ Plant', {family:'Araceae',genus:'Zamioculcas',species:'zamiifolia'}, 'low', 'medium', 8, 'generic', 'indoor', 'N', 12),
+      mk(cryptoRandomId(), 'Snake Plant', {family:'Asparagaceae',genus:'Dracaena',species:'trifasciata'}, 'low', 'medium', 6, 'cactus', 'indoor', 'W', 14),
+      mk(cryptoRandomId(), 'Fiddle-Leaf Fig', {family:'Moraceae',genus:'Ficus',species:'lyrata'}, 'high', 'large', 12, 'aroid', 'indoor', 'S', 6),
+      mk(cryptoRandomId(), 'Aloe', {family:'Asphodelaceae',genus:'Aloe',species:'vera'}, 'high', 'small', 6, 'cactus', 'outdoor', 'S', 10),
+    ];
   }
 
   // Kickoff
