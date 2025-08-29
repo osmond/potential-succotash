@@ -1,0 +1,10 @@
+{
+  "name": "Plant Tracker",
+  "short_name": "Plants",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1e16",
+  "theme_color": "#0f1e16",
+  "icons": []
+}
+
