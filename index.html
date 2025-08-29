@@ -76,12 +76,18 @@
             </div>
             <div class="actions" style="justify-content:flex-start; gap:.5rem; margin-top:.5rem">
               <button type="button" id="suggestTaxonomy" class="btn">Suggest Taxonomy</button>
+              <a id="gbifLink" class="btn ghost" href="#" target="_blank" rel="noreferrer noopener">GBIF</a>
+              <a id="wikiLink" class="btn ghost" href="#" target="_blank" rel="noreferrer noopener">Wikipedia</a>
             </div>
             <div id="taxoSuggestions" class="taxo-suggestions"></div>
           </div>
           <div class="row">
             <label for="cultivar">Cultivar</label>
             <input id="cultivar" placeholder="e.g., 'Albo Variegata'" />
+            <div class="actions" style="justify-content:flex-start; gap:.5rem; margin-top:.5rem">
+              <button type="button" id="suggestCultivar" class="btn">Suggest Cultivar</button>
+            </div>
+            <div id="cultivarSuggestions" class="taxo-suggestions"></div>
           </div>
           <div class="row">
             <label for="potDiameter">Pot diameter (cm)</label>
@@ -211,6 +217,7 @@
       <div class="modal-content card">
         <div class="modal-header">
           <h3 id="detailsTitle">Plant Details</h3>
+          <span id="detailsWx" class="pill wx-pill" style="display:none"></span>
           <button id="detailsClose" class="btn ghost">Close</button>
         </div>
         <canvas id="historyCanvas" width="800" height="260"></canvas>

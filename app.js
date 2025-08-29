@@ -150,6 +150,7 @@
     );
     const factor = seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneIntervalPct||0)/100));
     const env = envSummary(p);
+    const wx = wxPill(p);
     return `
       <article class="plant-card">
         <div class="cover"></div>
@@ -166,6 +167,7 @@
           <span class="pill">base ${Number(p.baseIntervalDays || 7)}d</span>
           <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
           ${tasksHTML}
+          ${wx}
         </div>
         <div class="env-summary">${escapeHtml(env)}</div>
         <div class="thumbs"></div>
@@ -244,7 +246,7 @@
     // Persist plant-level weather override if present
     const tag = document.getElementById('plantWeatherTag');
     if(tag && tag.dataset.temp && tag.dataset.rh){
-      plant.weatherOverride = { tempC: parseFloat(tag.dataset.temp), rh: parseFloat(tag.dataset.rh) };
+      plant.weatherOverride = { tempC: parseFloat(tag.dataset.temp), rh: parseFloat(tag.dataset.rh), fetchedAt: tag.dataset.time || new Date().toISOString() };
     }else{
       delete plant.weatherOverride;
     }
@@ -262,6 +264,61 @@
       renderTaxoSuggestions(suggestions);
     }catch(err){ alert('Suggestion failed'); }
   });
+
+  // Update GBIF/Wikipedia links when taxon fields change
+  ;['plantGenus','plantSpecies','plantName'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', updateTaxonLinks);
+  });
+  function updateTaxonLinks(){
+    const genus = document.getElementById('plantGenus').value.trim();
+    const species = document.getElementById('plantSpecies').value.trim();
+    const name = document.getElementById('plantName').value.trim();
+    const query = [genus, species].filter(Boolean).join(' ') || name;
+    const gbif = document.getElementById('gbifLink');
+    const wiki = document.getElementById('wikiLink');
+    if(!query){ gbif.href = '#'; wiki.href = '#'; return; }
+    gbif.href = `https://www.gbif.org/species/search?q=${encodeURIComponent(query)}`;
+    const wikiTitle = (genus && species) ? `${genus}_${species}` : query.replace(/\s+/g,'_');
+    wiki.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(wikiTitle)}`;
+  }
+
+  // Cultivar suggestions via OpenAI proxy (optional)
+  const cultBtn = document.getElementById('suggestCultivar');
+  if(cultBtn){
+    cultBtn.addEventListener('click', async () => {
+      const genus = document.getElementById('plantGenus').value.trim();
+      const species = document.getElementById('plantSpecies').value.trim();
+      const name = document.getElementById('plantName').value.trim();
+      try{
+        const list = await getCultivarSuggestions({ genus, species, name });
+        renderCultivarSuggestions(list);
+      }catch{ alert('Cultivar suggestion failed'); }
+    });
+  }
+  async function getCultivarSuggestions({ genus, species, name }){
+    if(!window.OPENAI_PROXY_URL) return [];
+    const q = [genus, species].filter(Boolean).join(' ');
+    const prompt = `Suggest 3-6 widely known horticultural cultivars for ${q || name}. Return a JSON array of strings with cultivar names only.`;
+    try{
+      const r = await fetch(window.OPENAI_PROXY_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ q: prompt }) });
+      if(!r.ok) return [];
+      const j = await r.json();
+      if(Array.isArray(j)) return j.filter(x => typeof x === 'string');
+      if(j && Array.isArray(j.cultivars)) return j.cultivars;
+      return [];
+    }catch{ return []; }
+  }
+  function renderCultivarSuggestions(list){
+    const host = document.getElementById('cultivarSuggestions');
+    if(!host) return; host.innerHTML = '';
+    if(!list || !list.length){ host.textContent = 'No cultivar suggestions.'; return; }
+    list.forEach(name => {
+      const chip = document.createElement('span'); chip.className = 'sugg'; chip.textContent = name; chip.title = 'Click to apply';
+      chip.onclick = () => { document.getElementById('cultivar').value = name; };
+      host.appendChild(chip);
+    });
+  }
 
   // Per-plant weather override
   document.getElementById('usePlantWeather').addEventListener('click', async () => {
@@ -283,12 +340,13 @@
       const tag = document.getElementById('plantWeatherTag');
       tag.textContent = `Plant weather: ${Math.round(t)}°C / ${Math.round(h)}%`;
       tag.dataset.temp = String(t); tag.dataset.rh = String(h);
+      tag.dataset.time = new Date().toISOString();
       updateWaterRec();
     }catch(err){ alert('Location permission or network failed'); }
   });
   document.getElementById('clearPlantWeather').addEventListener('click', () => {
     const tag = document.getElementById('plantWeatherTag');
-    tag.textContent = ''; delete tag.dataset.temp; delete tag.dataset.rh;
+    tag.textContent = ''; delete tag.dataset.temp; delete tag.dataset.rh; delete tag.dataset.time;
     updateWaterRec();
   });
 
@@ -403,6 +461,7 @@
     drawHistory($('#historyCanvas'), plant);
     bindObservations(plant);
     renderTasksChips(plant);
+    setDetailsWx(plant);
     modal.classList.add('show');
   }
 
@@ -546,6 +605,41 @@
     const parts = [soil, where, exp].filter(Boolean).join(' • ');
     const tuneStr = tunes.length ? ` • ${tunes.join(' ')}` : '';
     return (parts || '—') + tuneStr;
+  }
+
+  // Weather pill in Details header
+  function setDetailsWx(plant){
+    const el = document.getElementById('detailsWx');
+    if(!el) return;
+    if(plant.weatherOverride){
+      const t = Math.round(plant.weatherOverride.tempC);
+      const h = Math.round(plant.weatherOverride.rh);
+      const age = plant.weatherOverride.fetchedAt ? relTime(plant.weatherOverride.fetchedAt) : '';
+      el.textContent = `wx ${t}°C / ${h}%${age ? ' • ' + age : ''}`;
+      el.style.display = '';
+    }else{
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
+  function wxPill(p){
+    if(!p.weatherOverride) return '';
+    const age = p.weatherOverride.fetchedAt ? relTime(p.weatherOverride.fetchedAt) : '';
+    const label = `wx${age ? ' • ' + age : ''}`;
+    return `<span class="pill wx-pill" title="Plant weather override">${label}</span>`;
+  }
+
+  function relTime(iso){
+    try{
+      const then = new Date(iso).getTime();
+      const now = Date.now();
+      const s = Math.max(0, Math.round((now-then)/1000));
+      if(s < 60) return `${s}s`; const m = Math.round(s/60);
+      if(m < 60) return `${m}m`; const h = Math.round(m/60);
+      if(h < 48) return `${h}h`; const d = Math.round(h/24);
+      return `${d}d`;
+    }catch{ return ''; }
   }
 
   function labelForTask(t){
@@ -723,7 +817,15 @@
     const modeled = Math.max(1, Math.round(base * mult));
     const vol = estimateWaterMl(dcm, seasonal * micro, plant.tuneVolumePct);
     const rec = document.getElementById('waterRec');
-    if(rec) rec.textContent = vol ? `${vol.min}-${vol.max} ml per watering • every ~${modeled} days` : `every ~${modeled} days`;
+    if(rec){
+      if(vol){
+        const oz = { min: (vol.min/29.5735), max: (vol.max/29.5735) };
+        const fmt = (n) => (Math.round(n*10)/10).toFixed(1);
+        rec.textContent = `${vol.min}-${vol.max} ml (${fmt(oz.min)}–${fmt(oz.max)} oz) • every ~${modeled} days`;
+      }else{
+        rec.textContent = `every ~${modeled} days`;
+      }
+    }
   }
   function estimateWaterMl(diameterCm, factor){
     if(!diameterCm || diameterCm<=0) return null;
