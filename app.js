@@ -79,7 +79,8 @@
       $('#plantGenus').value = plant?.genus || '';
       $('#plantSpecies').value = plant?.species || '';
       $('#cultivar').value = plant?.cultivar || '';
-      $('#potDiameter').value = plant?.potDiameterCm || '';
+      const pin = (plant?.potDiameterIn != null) ? plant.potDiameterIn : (plant?.potDiameterCm ? (plant.potDiameterCm/2.54) : '');
+      $('#potDiameter').value = pin || '';
       $('#baseInterval').value = plant?.baseIntervalDays || 7;
       $('#lightLevel').value = plant?.lightLevel || 'medium';
       $('#potSize').value = plant?.potSize || 'medium';
@@ -151,6 +152,7 @@
     const factor = seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneIntervalPct||0)/100));
     const env = envSummary(p);
     const wx = wxPill(p);
+    const volPill = waterPill(p);
     return `
       <article class="plant-card">
         <div class="cover"></div>
@@ -168,6 +170,7 @@
           <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
           ${tasksHTML}
           ${wx}
+          ${volPill}
         </div>
         <div class="env-summary">${escapeHtml(env)}</div>
         <div class="thumbs"></div>
@@ -233,6 +236,7 @@
       family: $('#plantFamily').value.trim(),
       cultivar: $('#cultivar').value.trim(),
       baseIntervalDays: Number($('#baseInterval').value || 7),
+      potDiameterIn: Number($('#potDiameter').value || 0),
       lightLevel: $('#lightLevel').value,
       potSize: $('#potSize').value,
       soilType: $('#soilType').value,
@@ -266,22 +270,7 @@
   });
 
   // Update GBIF/Wikipedia links when taxon fields change
-  ;['plantGenus','plantSpecies','plantName'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.addEventListener('input', updateTaxonLinks);
-  });
-  function updateTaxonLinks(){
-    const genus = document.getElementById('plantGenus').value.trim();
-    const species = document.getElementById('plantSpecies').value.trim();
-    const name = document.getElementById('plantName').value.trim();
-    const query = [genus, species].filter(Boolean).join(' ') || name;
-    const gbif = document.getElementById('gbifLink');
-    const wiki = document.getElementById('wikiLink');
-    if(!query){ gbif.href = '#'; wiki.href = '#'; return; }
-    gbif.href = `https://www.gbif.org/species/search?q=${encodeURIComponent(query)}`;
-    const wikiTitle = (genus && species) ? `${genus}_${species}` : query.replace(/\s+/g,'_');
-    wiki.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(wikiTitle)}`;
-  }
+  // Removed external GBIF/Wikipedia buttons for a cleaner flow.
 
   // Cultivar suggestions via OpenAI proxy (optional)
   const cultBtn = document.getElementById('suggestCultivar');
@@ -320,6 +309,50 @@
     });
   }
 
+  // AI Care Plan (one-shot)
+  const planBtn = document.getElementById('generatePlanBtn');
+  if(planBtn){
+    planBtn.addEventListener('click', async () => {
+      const name = document.getElementById('plantName').value.trim();
+      const inout = document.getElementById('inout').value;
+      const exposure = document.getElementById('exposure').value;
+      const potIn = parseFloat(document.getElementById('potDiameter').value || '0');
+      if(!name){ alert('Enter a plant name or common name first'); return; }
+      if(!window.OPENAI_PLAN_URL){ alert('AI plan URL not configured.'); return; }
+      planBtn.disabled = true; planBtn.textContent = 'Generating…';
+      try{
+        const r = await fetch(window.OPENAI_PLAN_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name, inout, exposure, potIn }) });
+        if(!r.ok) throw new Error('plan');
+        const plan = await r.json();
+        applyCarePlan(plan);
+      }catch(err){ alert('Failed to generate care plan'); }
+      finally{ planBtn.disabled = false; planBtn.textContent = 'AI Care Plan'; }
+    });
+  }
+  function applyCarePlan(p){
+    if(p.family) document.getElementById('plantFamily').value = p.family;
+    if(p.genus) document.getElementById('plantGenus').value = p.genus;
+    if(p.species) document.getElementById('plantSpecies').value = p.species;
+    if(p.cultivar) document.getElementById('cultivar').value = p.cultivar;
+    if(p.potDiameterIn) document.getElementById('potDiameter').value = Number(p.potDiameterIn) || '';
+    if(p.lightLevel) document.getElementById('lightLevel').value = p.lightLevel;
+    if(p.soilType) document.getElementById('soilType').value = p.soilType;
+    if(Number.isFinite(p.baseIntervalDays)) document.getElementById('baseInterval').value = p.baseIntervalDays;
+    if(p.tasks && Array.isArray(p.tasks)){
+      const slots = ['1','2','3'];
+      for(let i=0;i<slots.length;i++){
+        const t = p.tasks[i]; if(!t) break;
+        document.getElementById(`task${slots[i]}Type`).value = t.type || '';
+        document.getElementById(`task${slots[i]}Every`).value = t.everyDays || '';
+      }
+    }
+    // Put care summary into notes if provided
+    if(p.careSummary){
+      const prev = document.getElementById('notes').value.trim();
+      document.getElementById('notes').value = p.careSummary + (prev ? ('\n\n' + prev) : '');
+    }
+    updateWaterRec();
+  }
   // Per-plant weather override
   document.getElementById('usePlantWeather').addEventListener('click', async () => {
     try{
@@ -642,6 +675,17 @@
     }catch{ return ''; }
   }
 
+  function waterPill(p){
+    const din = (p.potDiameterIn != null) ? p.potDiameterIn : (p.potDiameterCm ? (p.potDiameterCm/2.54) : 0);
+    if(!din || din<=0) return '';
+    const s = getSettings();
+    const vol = estimateWaterMlFromInches(din, seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneVolumePct||0)/100)));
+    if(!vol) return '';
+    const ozMin = Math.round((vol.min/29.5735)*10)/10;
+    const ozMax = Math.round((vol.max/29.5735)*10)/10;
+    return `<span class="pill water" title="Estimated per watering">${vol.min}-${vol.max} ml (${ozMin}–${ozMax} oz)</span>`;
+  }
+
   function labelForTask(t){
     const name = t.type === 'fertilize' ? 'fertilize' : (t.type === 'repot' ? 'repot' : t.type);
     if(t.nextDue){
@@ -799,7 +843,7 @@
   function updateWaterRec(){
     const base = Number($('#baseInterval').value||7);
     const light = $('#lightLevel').value; const pot = $('#potSize').value;
-    const dcm = Number($('#potDiameter').value||0);
+    const din = Number($('#potDiameter').value||0);
     const s = getSettings();
     const plant = {
       soilType: document.getElementById('soilType')?.value,
@@ -815,7 +859,7 @@
     const seasonal = seasonalMultiplier(s, override);
     const mult = intervalMultiplier(light, pot) * seasonal * micro * (1 + plant.tuneIntervalPct/100);
     const modeled = Math.max(1, Math.round(base * mult));
-    const vol = estimateWaterMl(dcm, seasonal * micro, plant.tuneVolumePct);
+    const vol = estimateWaterMlFromInches(din, seasonal * micro * (1 + plant.tuneVolumePct/100));
     const rec = document.getElementById('waterRec');
     if(rec){
       if(vol){
@@ -827,9 +871,9 @@
       }
     }
   }
-  function estimateWaterMl(diameterCm, factor){
-    if(!diameterCm || diameterCm<=0) return null;
-    const d = diameterCm/100; // m
+  function estimateWaterMlFromInches(diameterIn, factor){
+    if(!diameterIn || diameterIn<=0) return null;
+    const d = diameterIn * 0.0254; // m
     const h = d*0.9; // m, approx
     const volM3 = Math.PI*Math.pow(d/2,2)*h; // m^3
     const volLiters = volM3 * 1000; // L
