@@ -142,8 +142,14 @@
     const tasks = (p.tasks||[]).filter(t => t.type && t.everyDays).slice(0,2);
     const tasksHTML = tasks.map(t => `<span class="pill ${t.nextDue ? dueClass(t.nextDue) : ''}">${escapeHtml(labelForTask(t))}</span>`).join('');
     const s = getSettings();
-    const modeled = Math.round((p.baseIntervalDays||7) * intervalMultiplier(p.lightLevel, p.potSize) * seasonalMultiplier(s));
-    const factor = seasonalMultiplier(s);
+    const modeled = Math.round((p.baseIntervalDays||7)
+      * intervalMultiplier(p.lightLevel, p.potSize)
+      * seasonalMultiplier(s, p.weatherOverride)
+      * microEnvironmentMultiplier(p)
+      * (1 + (Number(p.tuneIntervalPct||0)/100))
+    );
+    const factor = seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneIntervalPct||0)/100));
+    const env = envSummary(p);
     return `
       <article class="plant-card">
         <div class="cover"></div>
@@ -161,6 +167,7 @@
           <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
           ${tasksHTML}
         </div>
+        <div class="env-summary">${escapeHtml(env)}</div>
         <div class="thumbs"></div>
         <div class="actions-row">
           <button class="btn small" data-action="water">Watered</button>
@@ -259,8 +266,12 @@
   // Per-plant weather override
   document.getElementById('usePlantWeather').addEventListener('click', async () => {
     try{
-      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej));
-      const { latitude: lat, longitude: lon } = pos.coords;
+      let lat = parseFloat(document.getElementById('plantLat').value || '');
+      let lon = parseFloat(document.getElementById('plantLon').value || '');
+      if(!Number.isFinite(lat) || !Number.isFinite(lon)){
+        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej));
+        lat = pos.coords.latitude; lon = pos.coords.longitude;
+      }
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m`;
       const r = await fetch(url);
       const j = await r.json();
@@ -525,6 +536,18 @@
     return parts.join(' • ');
   }
 
+  function envSummary(p){
+    const soil = p.soilType === 'cactus' ? 'cactus' : (p.soilType === 'aroid' ? 'aroid' : (p.soilType ? 'soil' : ''));
+    const where = p.inout === 'outdoor' ? 'outdoor' : (p.inout ? 'indoor' : '');
+    const exp = p.exposure || '';
+    const tunes = [];
+    if(p.tuneIntervalPct) tunes.push(`Δint ${p.tuneIntervalPct}%`);
+    if(p.tuneVolumePct) tunes.push(`Δvol ${p.tuneVolumePct}%`);
+    const parts = [soil, where, exp].filter(Boolean).join(' • ');
+    const tuneStr = tunes.length ? ` • ${tunes.join(' ')}` : '';
+    return (parts || '—') + tuneStr;
+  }
+
   function labelForTask(t){
     const name = t.type === 'fertilize' ? 'fertilize' : (t.type === 'repot' ? 'repot' : t.type);
     if(t.nextDue){
@@ -629,12 +652,14 @@
   function setSettings(next){
     localStorage.setItem('plant-settings', JSON.stringify(next));
   }
-  function seasonalMultiplier(s){
+  function seasonalMultiplier(s, override){
     const season = s.season || 'growing';
     const seasonFact = season==='peak' ? 0.9 : (season==='dormant' ? 1.2 : 1.0);
     let vpdFact = 1.0;
-    if(Number.isFinite(s.tempC) && Number.isFinite(s.rh)){
-      const T = s.tempC; const RH = Math.max(0, Math.min(100, s.rh));
+    const tc = Number.isFinite(override?.tempC) ? override.tempC : s.tempC;
+    const rh = Number.isFinite(override?.rh) ? override.rh : s.rh;
+    if(Number.isFinite(tc) && Number.isFinite(rh)){
+      const T = tc; const RH = Math.max(0, Math.min(100, rh));
       const svp = 0.6108 * Math.exp((17.27*T)/(T+237.3)); // kPa
       const vpd = svp * (1 - RH/100);
       vpdFact = clamp(1.0 - (vpd - 0.8)*0.3, 0.75, 1.15);
@@ -690,7 +715,10 @@
       tuneVolumePct: Number(document.getElementById('tuneVolumePct')?.value || 0),
     };
     const micro = microEnvironmentMultiplier(plant);
-    const seasonal = seasonalMultiplier(s);
+    // Use plant editor override if present in tag
+    const tag = document.getElementById('plantWeatherTag');
+    const override = (tag && tag.dataset.temp && tag.dataset.rh) ? { tempC: parseFloat(tag.dataset.temp), rh: parseFloat(tag.dataset.rh) } : undefined;
+    const seasonal = seasonalMultiplier(s, override);
     const mult = intervalMultiplier(light, pot) * seasonal * micro * (1 + plant.tuneIntervalPct/100);
     const modeled = Math.max(1, Math.round(base * mult));
     const vol = estimateWaterMl(dcm, seasonal * micro, plant.tuneVolumePct);
