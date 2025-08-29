@@ -55,21 +55,45 @@
             <button id="useWeather" class="btn px-3 py-2 rounded-xl">Use Local Weather</button>
           </div>
         </section>
-        <div class="toolbar">
-          <h2>Tasks</h2>
-          <div class="hint">Due now and upcoming</div>
+        <div class="toolbar flex items-end justify-between">
+          <div>
+            <h2 class="m-0">Tasks</h2>
+            <div class="hint">Due now and upcoming</div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <div class="flex rounded-xl overflow-hidden border" style="border-color: var(--border)">
+              <button id="viewToggleTasks" class="px-3 py-2 btn">Tasks</button>
+              <button id="viewTogglePlants" class="px-3 py-2 btn">Plants</button>
+            </div>
+            <select id="taskTypeFilter" class="px-2 py-2 rounded-xl border" style="border-color: var(--border)">
+              <option value="all">All</option>
+              <option value="water">Watering</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="taskWindowFilter" class="px-2 py-2 rounded-xl border" style="border-color: var(--border)">
+              <option value="7">7 days</option>
+              <option value="3">3 days</option>
+              <option value="14">14 days</option>
+              <option value="30">30 days</option>
+            </select>
+          </div>
         </div>
-        <div class="card">
+
+        <div id="tasksSection" class="card">
           <h3 style="margin:4px 0">Due</h3>
-          <ul id="dueList" class="plant-list"></ul>
+          <ul id="dueList" class="plant-list grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
           <h3 style="margin:8px 0 4px">Upcoming</h3>
-          <ul id="upcomingList" class="plant-list"></ul>
+          <ul id="upcomingList" class="plant-list grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
         </div>
         <div class="toolbar" style="margin-top:16px">
           <h2>Plants</h2>
         </div>
-        <ul id="plantList" class="plant-list"></ul>
+        <div id="plantsSection">
+          <ul id="plantList" class="plant-list grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
+        </div>
       </section>
+
+      <div id="toast" class="toast"></div>
 
       <section id="plantDetailView" class="view">
         <div class="card" id="plantDetailCard">

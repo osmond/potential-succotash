@@ -68,6 +68,7 @@
       $('#dashboardView').classList.add('active');
       renderList();
       renderScience();
+      applyHomeView();
     },
     showEditor(plant){
       $('#dashboardView').classList.remove('active');
@@ -137,6 +138,9 @@
     if(!dueHost || !upHost) return;
     dueHost.innerHTML = '';
     upHost.innerHTML = '';
+    const s = getSettings();
+    const filterType = s.taskType || 'all';
+    const windowDays = Number(s.taskWindow || 7);
     const items = [];
     const today = new Date();
     for(const p of plants){
@@ -144,13 +148,17 @@
       const waterDue = nextDueFrom(p);
       const d = parseDate(waterDue);
       const delta = daysBetween(today, d);
-      items.push({ plant:p, type:'water', title:`Water ${p.name||''}`.trim(), due: waterDue, delta });
+      if(filterType==='all' || filterType==='water'){
+        items.push({ plant:p, type:'water', title:`Water ${p.name||''}`.trim(), due: waterDue, delta });
+      }
       // Other tasks
       (p.tasks||[]).forEach(t => {
         const tdue = nextTaskDue(t, t.lastDone || p.lastWatered);
         if(tdue){
           const dt = daysBetween(today, parseDate(tdue));
-          items.push({ plant:p, type:t.type, task:t, title:`${capitalize(t.type)} ${p.name||''}`.trim(), due: tdue, delta: dt });
+          if(filterType==='all' || filterType==='other'){
+            items.push({ plant:p, type:t.type, task:t, title:`${capitalize(t.type)} ${p.name||''}`.trim(), due: tdue, delta: dt });
+          }
         }
       });
     }
@@ -159,7 +167,7 @@
       const li = document.createElement('li');
       li.innerHTML = taskCardHTML(it);
       bindTaskCard(li, it);
-      if(it.delta <= 0) dueHost.appendChild(li); else if(it.delta <= 7) upHost.appendChild(li);
+      if(it.delta <= 0) dueHost.appendChild(li); else if(it.delta <= windowDays) upHost.appendChild(li);
     }
   }
 
@@ -186,6 +194,42 @@
         </div>
       </article>
     `;
+  }
+
+  // Home view toggle + filter persistence
+  function applyHomeView(){
+    const s = getSettings();
+    const view = s.homeView || 'tasks';
+    const tasksSection = document.getElementById('tasksSection');
+    const plantsSection = document.getElementById('plantsSection');
+    if(tasksSection && plantsSection){
+      if(view === 'plants'){
+        tasksSection.style.display = 'none';
+        plantsSection.style.display = '';
+      }else{
+        tasksSection.style.display = '';
+        plantsSection.style.display = '';
+      }
+    }
+    const typeSel = document.getElementById('taskTypeFilter');
+    const winSel = document.getElementById('taskWindowFilter');
+    if(typeSel) typeSel.value = s.taskType || 'all';
+    if(winSel) winSel.value = String(s.taskWindow || 7);
+  }
+  const viewTasksBtn = document.getElementById('viewToggleTasks');
+  const viewPlantsBtn = document.getElementById('viewTogglePlants');
+  if(viewTasksBtn) viewTasksBtn.addEventListener('click', () => { const s=getSettings(); s.homeView='tasks'; setSettings(s); applyHomeView(); showToast('Showing tasks'); });
+  if(viewPlantsBtn) viewPlantsBtn.addEventListener('click', () => { const s=getSettings(); s.homeView='plants'; setSettings(s); applyHomeView(); showToast('Showing plants'); });
+  const typeSel = document.getElementById('taskTypeFilter');
+  const winSel = document.getElementById('taskWindowFilter');
+  if(typeSel) typeSel.addEventListener('change', async () => { const s=getSettings(); s.taskType=typeSel.value; setSettings(s); await renderList(); showToast('Filters saved'); });
+  if(winSel) winSel.addEventListener('change', async () => { const s=getSettings(); s.taskWindow=Number(winSel.value); setSettings(s); await renderList(); showToast('Filters saved'); });
+
+  function showToast(msg){
+    const t = document.getElementById('toast'); if(!t) return;
+    t.textContent = msg; t.style.display = 'block';
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => { t.style.display = 'none'; }, 1500);
   }
 
   function bindTaskCard(root, it){
