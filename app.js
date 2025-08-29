@@ -163,11 +163,37 @@
       });
     }
     items.sort((a,b) => a.due.localeCompare(b.due));
+    const sOnly = getSettings().onlyOverdue || false;
+    let addedOverdueHeader = false, addedTodayHeader = false;
     for(const it of items){
-      const li = document.createElement('li');
-      li.innerHTML = taskCardHTML(it);
-      bindTaskCard(li, it);
-      if(it.delta <= 0) dueHost.appendChild(li); else if(it.delta <= windowDays) upHost.appendChild(li);
+      if(sOnly){
+        if(it.delta < 0){
+          if(!addedOverdueHeader){
+            const h = document.createElement('li'); h.className='group-header'; h.textContent='Overdue'; dueHost.appendChild(h); addedOverdueHeader=true;
+          }
+          const li = document.createElement('li'); li.innerHTML = taskCardHTML(it); bindTaskCard(li, it); dueHost.appendChild(li);
+        }
+        continue;
+      }
+      if(it.delta < 0){
+        if(!addedOverdueHeader){ const h = document.createElement('li'); h.className='group-header'; h.textContent='Overdue'; dueHost.appendChild(h); addedOverdueHeader=true; }
+        const li = document.createElement('li'); li.innerHTML = taskCardHTML(it); bindTaskCard(li, it); dueHost.appendChild(li);
+      } else if(it.delta === 0){
+        if(!addedTodayHeader){ const h = document.createElement('li'); h.className='group-header'; h.textContent='Today'; dueHost.appendChild(h); addedTodayHeader=true; }
+        const li = document.createElement('li'); li.innerHTML = taskCardHTML(it); bindTaskCard(li, it); dueHost.appendChild(li);
+      } else if(it.delta <= windowDays){
+        const dayKey = it.due;
+        let header = upHost.querySelector(`[data-day='${dayKey}']`);
+        if(!header){
+          const hli = document.createElement('li');
+          hli.className = 'group-header';
+          hli.dataset.day = dayKey;
+          const date = new Date(dayKey+'T00:00:00');
+          hli.textContent = date.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+          upHost.appendChild(hli);
+        }
+        const li = document.createElement('li'); li.innerHTML = taskCardHTML(it); bindTaskCard(li, it); upHost.appendChild(li);
+      }
     }
   }
 
@@ -215,15 +241,21 @@
     const winSel = document.getElementById('taskWindowFilter');
     if(typeSel) typeSel.value = s.taskType || 'all';
     if(winSel) winSel.value = String(s.taskWindow || 7);
+    const onlyOverdue = document.getElementById('onlyOverdue');
+    if(onlyOverdue) onlyOverdue.checked = !!s.onlyOverdue;
   }
+  const resetFilters = document.getElementById('resetFilters');
+  if(resetFilters) resetFilters.addEventListener('click', async () => { const s=getSettings(); s.taskType='all'; s.taskWindow=7; s.onlyOverdue=false; setSettings(s); applyHomeView(); await renderList(); showToast('Filters reset'); });
   const viewTasksBtn = document.getElementById('viewToggleTasks');
   const viewPlantsBtn = document.getElementById('viewTogglePlants');
   if(viewTasksBtn) viewTasksBtn.addEventListener('click', () => { const s=getSettings(); s.homeView='tasks'; setSettings(s); applyHomeView(); showToast('Showing tasks'); });
   if(viewPlantsBtn) viewPlantsBtn.addEventListener('click', () => { const s=getSettings(); s.homeView='plants'; setSettings(s); applyHomeView(); showToast('Showing plants'); });
   const typeSel = document.getElementById('taskTypeFilter');
   const winSel = document.getElementById('taskWindowFilter');
+  const onlyOverdue = document.getElementById('onlyOverdue');
   if(typeSel) typeSel.addEventListener('change', async () => { const s=getSettings(); s.taskType=typeSel.value; setSettings(s); await renderList(); showToast('Filters saved'); });
   if(winSel) winSel.addEventListener('change', async () => { const s=getSettings(); s.taskWindow=Number(winSel.value); setSettings(s); await renderList(); showToast('Filters saved'); });
+  if(onlyOverdue) onlyOverdue.addEventListener('change', async () => { const s=getSettings(); s.onlyOverdue=!!onlyOverdue.checked; setSettings(s); await renderList(); showToast('Filters saved'); });
 
   function showToast(msg){
     const t = document.getElementById('toast'); if(!t) return;
