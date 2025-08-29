@@ -100,6 +100,8 @@
     Array.from(list.children).forEach(li => {
       try{ (JSON.parse(li.dataset.urls||'[]')).forEach(u => URL.revokeObjectURL(u)); }catch{}
     });
+    const openBtn = root.querySelector('[data-action="open"]');
+    if(openBtn) openBtn.addEventListener('click', () => navigateToPlant(plant.id));
     list.innerHTML = '';
     const plants = await PlantDB.all();
     plants.forEach(p => {
@@ -173,7 +175,7 @@
           <button class="btn small" data-action="water">Watered</button>
           <input type="file" accept="image/*" capture="environment" data-snap hidden />
           <button class="btn small icon" data-action="snap">Snap</button>
-          <button class="btn small" data-action="details">Details</button>
+          <button class="btn small" data-action="open">Open</button>
           <button class="btn small" data-action="edit">Edit</button>
           <button class="btn small danger" data-action="delete">Delete</button>
         </div>
@@ -524,7 +526,17 @@
     // Notes
     $('#detailNotes').textContent = plant.notes || '';
     // Weather
-    setDetailsWx(plant); $('#plantDetailWx').style.display = plant.weatherOverride ? '' : 'none'; $('#plantDetailWx').textContent = document.getElementById('detailsWx')?.textContent || $('#plantDetailWx').textContent;
+    const wxEl = $('#plantDetailWx');
+    if(plant.weatherOverride){
+      const t = Math.round(plant.weatherOverride.tempC);
+      const h = Math.round(plant.weatherOverride.rh);
+      const age = plant.weatherOverride.fetchedAt ? relTime(plant.weatherOverride.fetchedAt) : '';
+      wxEl.textContent = `wx ${t}°C / ${h}%${age ? ' • ' + age : ''}`;
+      wxEl.style.display = '';
+    }else{
+      wxEl.textContent = '';
+      wxEl.style.display = 'none';
+    }
     // Chart
     drawHistory($('#detailChart'), plant);
   }
