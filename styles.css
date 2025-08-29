@@ -76,6 +76,7 @@ main{ padding: 16px; max-width: 900px; margin: 0 auto }
 .plant-card .thumbs img{ width:40px; height:40px; object-fit:cover; border-radius:8px; border:1px solid var(--border) }
 .plant-card .header{ display:flex; align-items:center; justify-content:space-between; gap:.5rem }
 .env-summary{ color: var(--muted); font-size:.9rem; margin-top:2px }
+.detail .stats .pill{ margin-right:.25rem }
 .btn.icon{ padding:.35rem .5rem }
 .plant-card .name{ font-weight:700 }
 .plant-card .species{ color:var(--muted) }

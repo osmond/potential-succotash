@@ -108,3 +108,16 @@ That’s it — static app + serverless API in one project, with safe secrets ha
 
 - Use the Science Panel’s “Use Local Weather” to fetch Temp/RH via Open‑Meteo.
 - Season + VPD factor affects modeled intervals; exposure/soil adjusts micro‑environment.
+
+## Tailwind Setup
+
+- Integrated Tailwind via CDN for zero-build usage.
+- See `index.html` head: a minimal `tailwind.config` mirrors the app palette.
+- Existing CSS remains; you can gradually migrate components to utilities.
+
+Usage examples:
+- Add Tailwind utilities alongside current classes, e.g. `class="btn px-3 py-2 rounded-xl"`.
+- Layout tweaks: `class="grid grid-cols-1 md:grid-cols-2 gap-3"` on lists or panels.
+
+Production note:
+- For full tree-shaking, you can switch to a build step later (Tailwind CLI/PostCSS). For now, the CDN keeps things simple and works with the service worker cache.

@@ -164,15 +164,10 @@
           <div class="pill ${badge}">${escapeHtml(dueTxt)}</div>
         </div>
         <div class="stats">
-          <span title="Light level" class="pill">${escapeHtml(p.lightLevel || 'medium')}</span>
-          <span title="Pot size" class="pill">${escapeHtml(p.potSize || 'medium')}</span>
-          <span class="pill">base ${Number(p.baseIntervalDays || 7)}d</span>
           <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
-          ${tasksHTML}
           ${wx}
           ${volPill}
         </div>
-        <div class="env-summary">${escapeHtml(env)}</div>
         <div class="thumbs"></div>
         <div class="actions-row">
           <button class="btn small" data-action="water">Watered</button>
@@ -197,7 +192,9 @@
       await PlantDB.put(plant);
       renderList();
     });
-    root.querySelector('[data-action="details"]').addEventListener('click', () => openDetails(plant));
+    // Open detail view
+    const openBtn = root.querySelector('[data-action="open"]');
+    if(openBtn) openBtn.addEventListener('click', () => navigateToPlant(plant.id));
     const snapInput = root.querySelector('[data-snap]');
     root.querySelector('[data-action="snap"]').addEventListener('click', () => snapInput.click());
     snapInput.addEventListener('change', async () => {
@@ -486,16 +483,50 @@
   })();
 
   // Details modal with chart
-  const modal = $('#detailsModal');
-  $('#detailsClose').addEventListener('click', () => modal.classList.remove('show'));
-  function openDetails(plant){
-    $('#detailsTitle').textContent = plant.name || 'Plant Details';
-    $('#detailsMeta').innerHTML = escapeHtml(detailMeta(plant));
-    drawHistory($('#historyCanvas'), plant);
-    bindObservations(plant);
-    renderTasksChips(plant);
-    setDetailsWx(plant);
-    modal.classList.add('show');
+  // Full-page detail view
+  async function showPlantDetail(id){
+    const plant = await PlantDB.get(id);
+    if(!plant){ location.hash = ''; return; }
+    $('#dashboardView').classList.remove('active');
+    $('#editorView').classList.remove('active');
+    $('#plantDetailView').classList.add('active');
+    // Header
+    $('#plantDetailTitle').textContent = plant.name || 'Plant';
+    $('#plantDetailTaxon').textContent = taxonLine(plant);
+    // Cover
+    const cover = $('#plantDetailCover'); cover.style.backgroundImage = '';
+    const photos = (plant.observations||[]).filter(o=>o.type==='photo'&&o.fileId).sort((a,b)=> (a.at<b.at?1:-1));
+    if(plant.coverFileId) photos.unshift({fileId: plant.coverFileId});
+    if(photos[0]){
+      const blob = await PlantDB.getFile(photos[0].fileId); if(blob){ cover.style.backgroundImage = `url('${URL.createObjectURL(blob)}')`; }
+    }
+    // Stats
+    const s = getSettings();
+    const modeled = Math.round((plant.baseIntervalDays||7) * intervalMultiplier(plant.lightLevel, plant.potSize) * seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100)));
+    const factor = seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100));
+    const water = waterPill(plant);
+    const dueTxt = humanDue(nextDueFrom(plant));
+    const stats = $('#plantDetailStats');
+    stats.innerHTML = `<span class="pill">model ${modeled}d ×${factor.toFixed(2)}</span> ${water} <span class="pill ${dueClass(nextDueFrom(plant))}">${escapeHtml(dueTxt)}</span>`;
+    // Actions
+    $('#detailBack').onclick = () => { location.hash = ''; };
+    $('#detailEdit').onclick = () => { views.showEditor(plant); location.hash = '#editor'; };
+    $('#detailWater').onclick = async () => { plant.lastWatered = todayISO(); plant.history = plant.history||[]; plant.history.push({type:'water', at: todayISO()}); await PlantDB.put(plant); showPlantDetail(plant.id); };
+    $('#detailSnap').onclick = () => $('#detailSnapInput').click();
+    $('#detailSnapInput').onchange = async (e) => { const f = e.target.files?.[0]; if(!f) return; const resized = await resizeImage(f,1600); const obs={id:cryptoRandomId(),at:new Date().toISOString(),type:'photo',fileId:await PlantDB.putFile(resized)}; plant.observations=plant.observations||[]; plant.observations.push(obs); await PlantDB.put(plant); showPlantDetail(plant.id); };
+    // Observations
+    await renderObsListFor($('#detailObsList'), plant);
+    $('#detailObsAdd').onclick = async () => {
+      const noteEl=$('#detailObsNote'); const fileEl=$('#detailObsPhoto'); const obs={id:cryptoRandomId(),at:new Date().toISOString(),note:noteEl.value.trim(),type:'note'}; if(fileEl.files&&fileEl.files[0]){const resized=await resizeImage(fileEl.files[0],1600); obs.type='photo'; obs.fileId=await PlantDB.putFile(resized);} plant.observations=plant.observations||[]; plant.observations.push(obs); plant.history=plant.history||[]; plant.history.push({type:'observe', at: obs.at}); await PlantDB.put(plant); noteEl.value=''; fileEl.value=''; renderObsListFor($('#detailObsList'), plant);
+    };
+    // Tasks
+    renderTasksChipsFor($('#detailTaskList'), plant);
+    // Notes
+    $('#detailNotes').textContent = plant.notes || '';
+    // Weather
+    setDetailsWx(plant); $('#plantDetailWx').style.display = plant.weatherOverride ? '' : 'none'; $('#plantDetailWx').textContent = document.getElementById('detailsWx')?.textContent || $('#plantDetailWx').textContent;
+    // Chart
+    drawHistory($('#detailChart'), plant);
   }
 
   function drawHistory(canvas, plant){
@@ -585,6 +616,22 @@
         setBtn.onclick = async () => { plant.coverFileId = o.fileId; await PlantDB.put(plant); renderList(); };
         actions.appendChild(setBtn);
         div.appendChild(actions);
+      }else{
+        div.innerHTML = `<div class="caption">${escapeHtml(o.note||'')} • ${escapeHtml(new Date(o.at).toLocaleDateString())}</div>`;
+      }
+      wrap.appendChild(div);
+    }
+  }
+
+  async function renderObsListFor(wrap, plant){
+    wrap.innerHTML = '';
+    const obs = (plant.observations||[]).slice().sort((a,b)=> (a.at<b.at?1:-1));
+    for(const o of obs){
+      const div = document.createElement('div');
+      div.className = 'obs-card';
+      if(o.fileId){
+        const blob = await PlantDB.getFile(o.fileId); const url = blob ? URL.createObjectURL(blob) : '';
+        div.innerHTML = `<img src="${url}"><div class="caption">${escapeHtml(o.note||'')} • ${escapeHtml(new Date(o.at).toLocaleDateString())}</div>`;
       }else{
         div.innerHTML = `<div class="caption">${escapeHtml(o.note||'')} • ${escapeHtml(new Date(o.at).toLocaleDateString())}</div>`;
       }
@@ -710,6 +757,26 @@
         plant.history.push({ type:`task:${t.type}`, at: t.lastDone });
         await PlantDB.put(plant);
         renderTasksChips(plant);
+        renderList();
+      });
+      host.appendChild(chip);
+    }
+  }
+
+  function renderTasksChipsFor(host, plant){
+    host.innerHTML = '';
+    const tasks = (plant.tasks||[]).filter(t=>t.type && t.everyDays);
+    for(const t of tasks){
+      t.nextDue = nextTaskDue(t, t.lastDone || plant.lastWatered);
+      const chip = document.createElement('span');
+      chip.className = 'task-chip';
+      chip.innerHTML = `<span class="pill ${t.nextDue?dueClass(t.nextDue):''}">${escapeHtml(labelForTask(t))}</span> <button title="Mark done">Done</button>`;
+      chip.querySelector('button').addEventListener('click', async () => {
+        t.lastDone = todayISO();
+        plant.history = Array.isArray(plant.history) ? plant.history : [];
+        plant.history.push({ type:`task:${t.type}`, at: t.lastDone });
+        await PlantDB.put(plant);
+        renderTasksChipsFor(host, plant);
         renderList();
       });
       host.appendChild(chip);
@@ -920,5 +987,18 @@
   }
 
   // Kickoff
-  views.showDashboard();
+  function navigateToPlant(id){ location.hash = `#plant/${id}`; }
+  function handleHash(){
+    const h = location.hash;
+    if(h.startsWith('#plant/')){
+      const id = h.split('/')[1];
+      showPlantDetail(id);
+      return;
+    }
+    // default dashboard
+    $('#plantDetailView').classList.remove('active');
+    views.showDashboard();
+  }
+  window.addEventListener('hashchange', handleHash);
+  handleHash();
 })();

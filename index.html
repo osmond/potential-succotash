@@ -7,19 +7,41 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <title>Plant Tracker</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%2308a57b' d='M50 8c8 20 23 25 23 38 0 9-7 15-15 17 4-10-1-24-8-33-7 9-12 23-8 33-8-2-15-8-15-17 0-13 15-18 23-38Z'/%3E%3Crect x='47' y='60' width='6' height='30' rx='3' fill='%232e3e37'/%3E%3C/svg%3E" />
+    <script>
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = {
+        darkMode: 'media',
+        theme: {
+          extend: {
+            colors: {
+              ink: '#e9f5ef',
+              bg: '#0f1e16',
+              panel: '#15241e',
+              panel2: '#1a2d25',
+              border: '#244437',
+              accent: '#14b893',
+              danger: '#ff6b6b',
+              muted: '#a9c8ba'
+            },
+            borderRadius: { xl: '0.75rem' }
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="app-header">
+    <header class="app-header sticky top-0 backdrop-blur border-b border-[color:var(--border)]">
       <h1>Plant Tracker</h1>
-      <nav class="top-actions">
-        <button id="addPlantBtn" class="btn primary">Add Plant</button>
-        <button id="icsBtn" class="btn">Reminders (.ics)</button>
-        <button id="shareBtn" class="btn">Share</button>
-        <button id="exportBtn" class="btn">Export</button>
+      <nav class="top-actions flex gap-2">
+        <button id="addPlantBtn" class="btn primary px-3 py-2 rounded-xl">Add Plant</button>
+        <button id="icsBtn" class="btn px-3 py-2 rounded-xl">Reminders (.ics)</button>
+        <button id="shareBtn" class="btn px-3 py-2 rounded-xl">Share</button>
+        <button id="exportBtn" class="btn px-3 py-2 rounded-xl">Export</button>
         <label class="import">
           <input id="importInput" type="file" accept="application/json" hidden />
-          <span class="btn">Import</span>
+          <span class="btn px-3 py-2 rounded-xl">Import</span>
         </label>
       </nav>
     </header>
@@ -50,7 +72,7 @@
             </div>
           </div>
           <div class="actions" style="margin-top:.5rem; justify-content:flex-start">
-            <button id="useWeather" class="btn">Use Local Weather</button>
+            <button id="useWeather" class="btn px-3 py-2 rounded-xl">Use Local Weather</button>
           </div>
         </section>
         <div class="toolbar">
@@ -58,6 +80,56 @@
           <div class="hint">Light, pot, and science multipliers</div>
         </div>
         <ul id="plantList" class="plant-list"></ul>
+      </section>
+
+      <section id="plantDetailView" class="view">
+        <div class="card" id="plantDetailCard">
+          <div class="toolbar" style="justify-content:space-between; align-items:center">
+            <div>
+              <button id="detailBack" class="btn">Back</button>
+            </div>
+            <div class="flex" style="display:flex; gap:.5rem; align-items:center">
+              <span id="plantDetailWx" class="pill wx-pill" style="display:none"></span>
+              <button id="detailEdit" class="btn">Edit</button>
+            </div>
+          </div>
+          <div id="detailHeader" class="row">
+            <h2 id="plantDetailTitle" style="margin:0"></h2>
+            <div id="plantDetailTaxon" class="muted"></div>
+          </div>
+          <div id="plantDetailCover" class="cover" style="width:100%; aspect-ratio: 16/9; border-radius:10px; border:1px solid var(--border); background: var(--panel-2);"></div>
+          <div class="row">
+            <div id="plantDetailStats" class="stats" style="display:flex; gap:.5rem; flex-wrap:wrap"></div>
+            <div class="actions-row">
+              <button id="detailWater" class="btn">Watered</button>
+              <input id="detailSnapInput" type="file" accept="image/*" capture="environment" hidden />
+              <button id="detailSnap" class="btn">Snap</button>
+            </div>
+          </div>
+          <div class="row" style="display:grid; gap:12px; grid-template-columns: 1fr;">
+            <div>
+              <label>Observations</label>
+              <div class="obs-row">
+                <input id="detailObsNote" placeholder="Observation note" />
+                <input id="detailObsPhoto" type="file" accept="image/*" />
+                <button id="detailObsAdd" class="btn">Add</button>
+              </div>
+              <div id="detailObsList" class="obs-list" style="margin-top:8px"></div>
+            </div>
+            <div>
+              <label>Tasks</label>
+              <div id="detailTaskList" class="task-list"></div>
+            </div>
+            <div>
+              <label>Notes</label>
+              <div id="detailNotes" class="card" style="padding:12px"></div>
+            </div>
+            <div>
+              <label>History</label>
+              <canvas id="detailChart" width="800" height="260"></canvas>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="editorView" class="view">
@@ -214,30 +286,7 @@
       </section>
     </main>
 
-    <div id="detailsModal" class="modal">
-      <div class="modal-content card">
-        <div class="modal-header">
-          <h3 id="detailsTitle">Plant Details</h3>
-          <span id="detailsWx" class="pill wx-pill" style="display:none"></span>
-          <button id="detailsClose" class="btn ghost">Close</button>
-        </div>
-        <canvas id="historyCanvas" width="800" height="260"></canvas>
-        <div id="detailsMeta" class="details-meta"></div>
-        <div class="row">
-          <label>Add Observation</label>
-          <div class="obs-row">
-            <input id="obsNote" placeholder="Observation note (growth, pests, bloom)" />
-            <input id="obsPhoto" type="file" accept="image/*" capture="environment" />
-            <button id="obsAddBtn" class="btn">Add</button>
-          </div>
-        </div>
-        <div id="obsList" class="obs-list"></div>
-        <div class="row">
-          <label>Tasks</label>
-          <div id="taskList" class="task-list"></div>
-        </div>
-      </div>
-    </div>
+    <!-- Modal removed in favor of full detail view -->
 
     <footer class="app-footer">
       <span>Local-first, offline-ready</span>
