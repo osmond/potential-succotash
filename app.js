@@ -1033,28 +1033,7 @@
         temperature: plant.weatherOverride?.tempC,
         humidity: plant.weatherOverride?.rh,
       };
-      root.render(React.createElement(PlantDetail, {
-        plant: plantMeta,
-        hydration,
-        metrics,
-        onWater: async () => {
-          plant.lastWatered = todayISO();
-          plant.history = plant.history || [];
-          plant.history.push({ type: 'water', at: todayISO(), amount: plant.carePlan?.waterMl });
-          await PlantDB.put(plant);
-          render();
-        },
-        onPhoto: async (file) => {
-          const resized = await resizeImage(file,1600);
-          const obs={id:cryptoRandomId(),at:new Date().toISOString(),type:'photo',fileId:await PlantDB.putFile(resized)};
-          plant.observations=plant.observations||[];
-          plant.observations.push(obs);
-          plant.history=plant.history||[];
-          plant.history.push({type:'observe', at: obs.at});
-          await PlantDB.put(plant);
-          render();
-        }
-      }));
+      root.render(React.createElement(PlantDetail, { plantId: plant.id }));
     }
     render();
   }
