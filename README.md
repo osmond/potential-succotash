@@ -11,6 +11,37 @@ Nerdy and beautiful plant tracker that works on phone and laptop.
 
 Open `index.html` in a modern browser. No build step required.
 
+## Local Development
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+2. **Start the dev server**
+   ```bash
+   npm run dev
+   ```
+   Serves the repo root on `http://localhost:5173` (or `PORT` if set) and auto‑opens `health.html` in your browser.
+3. **Iterate**
+   - Edit any `.html`, `.css`, or `.js` file; refresh the browser to see changes.
+   - Run `npm run build` if you need to regenerate `tailwind.css`.
+
+> **Quick start (no dev server):** open `index.html` directly in a browser for simple tweaks.
+
+## Local Build
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+2. **Build the static assets**
+   ```bash
+   npm run build
+   ```
+   Runs Tailwind CSS and packages the app into `.vercel/output`, producing `index.html`, `health.html`, `styles.css`, `tailwind.css`, `app.js`, `db.js`, `sw.js`, `manifest.webmanifest`, and `config.js`.
+3. **Open the built files**
+   After the build finishes, open `health.html` (or `index.html`) in a browser to verify the local build.
+
 ## Current Features
 
 - Add/edit plants with species, light level, pot size, and base watering interval
@@ -137,12 +168,6 @@ Checklist:
   - Output Directory: leave blank (root)
 - Environment → Add `OPENAI_API_KEY`
 - Deploy
-
-Local dev helper
-
-- Install deps: `npm install`
-- Start local static server and open health page: `npm run dev`
-- Or build once: `npm run build` and open `health.html` in the browser
 
 What the build does:
 
