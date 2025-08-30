@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import PlantCard from "./PlantCard.jsx";
 import {
   Droplet,
   ChevronDown,
@@ -78,10 +79,6 @@ export interface PlantDetailProps {
   onAdjustPlan?: () => void | Promise<void>;
 }
 
-const size = 120;
-const stroke = 8;
-const radius = (size - stroke) / 2;
-const circumference = 2 * Math.PI * radius;
 
 export const PlantDetail: React.FC<PlantDetailProps> = ({
   plant,
@@ -92,10 +89,8 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   onAdjustPlan,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const [dashOffset, setDashOffset] = useState(circumference);
   const [photos, setPhotos] = useState<string[]>([]);
   const [hydrationStatus, setHydrationStatus] = useState(hydration);
-  const [displayHydration, setDisplayHydration] = useState(0);
   const [dataPanelOpen, setDataPanelOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState<Record<string, boolean>>({});
   const [historyState, setHistoryState] = useState<PlantEvent[]>(plant.history || []);
@@ -124,24 +119,6 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   useEffect(() => {
     setHydrationStatus(hydration);
   }, [hydration]);
-
-  useEffect(() => {
-    let start: number | null = null;
-    const from = displayHydration;
-    const to = Math.min(Math.max(hydrationStatus.level, 0), 100);
-    const duration = 700;
-
-    const animate = (timestamp: number) => {
-      if (!start) start = timestamp;
-      const progress = Math.min((timestamp - start) / duration, 1);
-      const value = Math.round(from + (to - from) * progress);
-      setDisplayHydration(value);
-      setDashOffset(circumference - (value / 100) * circumference);
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-
-    requestAnimationFrame(animate);
-  }, [hydrationStatus.level]);
 
   useEffect(() => {
     setHistoryState(plant.history || []);
@@ -297,89 +274,40 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 max-w-sm mx-auto">
-      <div className="flex items-center space-x-4">
-        {plant.imageUrl && (
-          <img src={plant.imageUrl} alt={plant.name} className="w-16 h-16 rounded-lg object-cover" />
+    <PlantCard plant={plant} hydration={hydrationStatus.level}>
+      <button
+        onClick={() => setDataPanelOpen((o) => !o)}
+        className="mt-4 flex items-center text-sm text-green-600"
+      >
+        {dataPanelOpen ? (
+          <ChevronUp className="w-4 h-4 mr-1" />
+        ) : (
+          <ChevronDown className="w-4 h-4 mr-1" />
         )}
-        <div>
-          <h2 className="text-xl font-semibold">{plant.name}</h2>
-          {plant.species && <p className="text-sm text-gray-500">{plant.species}</p>}
-        </div>
-      </div>
+        {dataPanelOpen ? "Hide data" : "Show data"}
+      </button>
 
-      <div className="mt-6 flex flex-col items-center">
-        <div className="relative w-[120px] h-[120px]">
-          <svg
-            width={size}
-            height={size}
-            className="transform -rotate-90"
-            viewBox={`0 0 ${size} ${size}`}
-          >
-            <circle
-              stroke="currentColor"
-              className="text-gray-200"
-              strokeWidth={stroke}
-              fill="transparent"
-              r={radius}
-              cx={size / 2}
-              cy={size / 2}
-            />
-            <circle
-              stroke="currentColor"
-              className="text-blue-500"
-              strokeWidth={stroke}
-              strokeLinecap="round"
-              fill="transparent"
-              r={radius}
-              cx={size / 2}
-              cy={size / 2}
-              style={{
-                strokeDasharray: `${circumference} ${circumference}`,
-                strokeDashoffset: dashOffset,
-                transition: "stroke-dashoffset 0.7s ease-out",
-              }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xl font-bold">{displayHydration}%</span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setDataPanelOpen((o) => !o)}
-          className="mt-4 flex items-center text-sm text-green-600"
-        >
-          {dataPanelOpen ? (
-            <ChevronUp className="w-4 h-4 mr-1" />
-          ) : (
-            <ChevronDown className="w-4 h-4 mr-1" />
-          )}
-          {dataPanelOpen ? "Hide data" : "Show data"}
-        </button>
-
-        {dataPanelOpen && (
-          <div className="mt-4 w-full space-y-3 text-sm">
-            {metricDetails.map((m) => (
-              <div key={m.key} className="flex flex-col">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{m.label}</span>
-                  <div className="flex items-center space-x-1">
-                    <span>{m.value}</span>
-                    <Info
-                      className="w-4 h-4 text-gray-400 cursor-pointer"
-                      onClick={() => toggleInfo(m.key)}
-                    />
-                  </div>
+      {dataPanelOpen && (
+        <div className="mt-4 w-full space-y-3 text-sm">
+          {metricDetails.map((m) => (
+            <div key={m.key} className="flex flex-col">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{m.label}</span>
+                <div className="flex items-center space-x-1">
+                  <span>{m.value}</span>
+                  <Info
+                    className="w-4 h-4 text-gray-400 cursor-pointer"
+                    onClick={() => toggleInfo(m.key)}
+                  />
                 </div>
-                {infoOpen[m.key] && (
-                  <p className="mt-1 text-xs text-gray-500">{m.tip}</p>
-                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {infoOpen[m.key] && (
+                <p className="mt-1 text-xs text-gray-500">{m.tip}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {suggestions.length > 0 && (
         <div className="mt-4">
@@ -497,6 +425,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
           </div>
         </div>
       )}
+
       <div className="fixed bottom-6 right-6 z-50">
         {fabActions.map((action, i) => {
           const Icon = action.icon;
@@ -527,9 +456,8 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
           className="hidden"
         />
       </div>
-    </div>
+    </PlantCard>
   );
 };
 
 export default PlantDetail;
-
