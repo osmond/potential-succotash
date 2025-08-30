@@ -8,25 +8,21 @@ Nerdy and beautiful plant tracker that works on phone and laptop.
 - Basic features now; room to grow nerdy insights later
 
 ## Quick Start
-
-Open `index.html` in a modern browser. No build step required.
-
-## Local Development
-
 1. **Install dependencies**
    ```bash
    npm install
    ```
-2. **Start the dev server**
+2. **Start the Vite dev server**
    ```bash
    npm run dev
    ```
-   Serves the repo root on `http://localhost:5173` (or `PORT` if set) and auto‑opens `health.html` in your browser.
-3. **Iterate**
-   - Edit any `.html`, `.css`, or `.js` file; refresh the browser to see changes.
-   - Run `npm run build` if you need to regenerate `tailwind.css`.
-
-> **Quick start (no dev server):** open `index.html` directly in a browser for simple tweaks.
+   Serves the app on `http://localhost:5173` (or `PORT` if set) and auto‑opens `health.html` in your browser.
+   React components such as `RoomsView` in `src/` are the entry point; edit components and Vite hot‑reloads the page.
+3. **Build for production**
+   ```bash
+   npm run build
+   ```
+   Generates optimized assets in `.vercel/output`.
 
 ## Local Build
 
@@ -38,9 +34,9 @@ Open `index.html` in a modern browser. No build step required.
    ```bash
    npm run build
    ```
-   Runs Tailwind CSS and packages the app into `.vercel/output`, producing `index.html`, `health.html`, `styles.css`, `tailwind.css`, `app.js`, `db.js`, `sw.js`, `manifest.webmanifest`, and `config.js`.
+   Runs Tailwind CSS and packages the app into `.vercel/output`, producing `index.html`, `health.html`, `styles.css`, `tailwind.css`, `db.js`, `sw.js`, `manifest.webmanifest`, and `config.js`.
 3. **Open the built files**
-   After the build finishes, open `health.html` (or `index.html`) in a browser to verify the local build.
+   After the build finishes, open `health.html` in a browser to verify the local build.
 
 ## Current Features
 
@@ -142,8 +138,8 @@ That’s it — static app + serverless API in one project, with safe secrets ha
 
 ## Tailwind Setup
 
-- Integrated Tailwind via CDN for zero-build usage.
-- See `index.html` head: a minimal `tailwind.config` mirrors the app palette.
+- Integrated Tailwind via Vite for zero-build usage.
+- Tailwind is wired through Vite; configuration lives in `tailwind.config.js`.
 - Existing CSS remains; you can gradually migrate components to utilities.
 
 Usage examples:
@@ -172,7 +168,7 @@ Checklist:
 What the build does:
 
 - Runs Tailwind CLI to generate `tailwind.css`
-- Emits `.vercel/output/static` with: `index.html`, `health.html`, `styles.css`, `tailwind.css`, `app.js`, `db.js`, `sw.js`, `manifest.webmanifest`, `config.js`
+- Emits `.vercel/output/static` with: `index.html`, `health.html`, `styles.css`, `tailwind.css`, `db.js`, `sw.js`, `manifest.webmanifest`, `config.js`
 - Emits functions at `.vercel/output/functions/api/{suggest,plan}.func`
 
 Verify after deploy:
