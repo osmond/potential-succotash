@@ -7,7 +7,6 @@ import {
   Camera,
   Activity,
   Plus,
-  X,
   Info,
 } from "lucide-react";
 import {
@@ -118,9 +117,6 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   );
   const [fabOpen, setFabOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const fabClassName = fabOpen
-    ? "opacity-100 translate-y-0"
-    : "opacity-0 translate-y-4 pointer-events-none";
 
   const toggleInfo = (key: string) =>
     setInfoOpen((o) => ({ ...o, [key]: !o[key] }));
@@ -255,6 +251,17 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const handleFabPhoto = () => {
     fileInputRef.current?.click();
   };
+
+  const fabActions = [
+    { icon: Droplet, color: "bg-blue-500", handler: handleAddWater, label: "Add water" },
+    {
+      icon: FlaskConical,
+      color: "bg-green-500",
+      handler: handleAddFertilizer,
+      label: "Add fertilizer",
+    },
+    { icon: Camera, color: "bg-yellow-500", handler: handleFabPhoto, label: "Add photo" },
+  ];
 
   const metricDetails = [
     {
@@ -491,35 +498,26 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
         </div>
       )}
       <div className="fixed bottom-6 right-6 z-50">
-        <div className={`flex flex-col items-center mb-4 transition-all duration-300 ${fabClassName}`}>
-          <button
-            onClick={handleAddWater}
-            className="mb-2 p-3 rounded-full bg-blue-500 text-white shadow-lg"
-            aria-label="Add water"
-          >
-            <Droplet className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleAddFertilizer}
-            className="mb-2 p-3 rounded-full bg-green-500 text-white shadow-lg"
-            aria-label="Add fertilizer"
-          >
-            <FlaskConical className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleFabPhoto}
-            className="mb-2 p-3 rounded-full bg-yellow-500 text-white shadow-lg"
-            aria-label="Add photo"
-          >
-            <Camera className="w-5 h-5" />
-          </button>
-        </div>
+        {fabActions.map((action, i) => {
+          const Icon = action.icon;
+          return (
+            <button
+              key={action.label}
+              onClick={action.handler}
+              aria-label={action.label}
+              className={`${action.color} p-3 rounded-full text-white shadow-lg absolute bottom-0 right-0 transform transition-all duration-300 ${fabOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              style={{ transform: fabOpen ? `translateY(-${(i + 1) * 56}px)` : 'translateY(0)' }}
+            >
+              <Icon className="w-5 h-5" />
+            </button>
+          );
+        })}
         <button
           onClick={() => setFabOpen((o) => !o)}
-          className="p-4 rounded-full bg-green-600 text-white shadow-lg transition-transform duration-300"
+          className={`p-4 rounded-full bg-green-600 text-white shadow-lg transition-transform duration-300 transform ${fabOpen ? 'rotate-45' : ''}`}
           aria-label="Toggle actions"
         >
-          {fabOpen ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+          <Plus className="w-6 h-6" />
         </button>
         <input
           type="file"
