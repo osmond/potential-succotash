@@ -66,6 +66,7 @@
     showDashboard(){
       $('#editorView').classList.remove('active');
       $('#dashboardView').classList.add('active');
+      $('#plantsPage').classList.remove('active');
       renderList();
       renderScience();
       applyHomeView();
@@ -92,6 +93,12 @@
       $('#lastWatered').value = plant?.lastWatered || '';
       $('#notes').value = plant?.notes || '';
       try{ updateWaterRec(); }catch{}
+    },
+    showPlantsPage(){
+      $('#dashboardView').classList.remove('active');
+      $('#editorView').classList.remove('active');
+      $('#plantsPage').classList.add('active');
+      renderAllPlants();
     }
   };
 
@@ -123,14 +130,57 @@
       (p.tasks||[]).forEach(t => t.nextDue = nextTaskDue(t, t.lastDone || p.lastWatered));
     });
     plants.sort((a,b) => a.nextDue.localeCompare(b.nextDue));
+    const s = getSettings();
+    const mode = s.plantsView || 'cards';
     for(const plant of plants){
       const li = document.createElement('li');
-      li.innerHTML = cardHTML(plant);
+      li.innerHTML = mode === 'rows' ? rowHTML(plant) : cardHTML(plant);
       bindCard(li, plant);
       list.appendChild(li);
       enrichCardWithMedia(li, plant);
     }
     if(window.lucideRender) window.lucideRender();
+  }
+
+  function rowHTML(p){
+    const dueTxt = humanDue(p.nextDue);
+    const badge = dueClass(p.nextDue);
+    const s = getSettings();
+    const modeled = Math.round((p.baseIntervalDays||7)
+      * intervalMultiplier(p.lightLevel, p.potSize)
+      * seasonalMultiplier(s, p.weatherOverride)
+      * microEnvironmentMultiplier(p)
+      * (1 + (Number(p.tuneIntervalPct||0)/100))
+    );
+    const factor = seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneIntervalPct||0)/100));
+    const wx = wxPill(p);
+    const volPill = waterPill(p);
+    return `
+      <article class="rounded-xl border p-2 bg-[color:var(--panel)] border-[color:var(--border)] flex items-center gap-3">
+        <div class="cover w-16 h-10 rounded border border-[color:var(--border)] bg-[color:var(--panel-2)]"></div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="font-semibold">${escapeHtml(p.name || 'Untitled')}</div>
+              <div class="text-sm text-[color:var(--muted)]">${escapeHtml(taxonLine(p))}</div>
+            </div>
+            <div class="pill ${badge}">${escapeHtml(dueTxt)}</div>
+          </div>
+          <div class="flex flex-wrap gap-2 items-center mt-1">
+            <span class="pill" title="Modeled interval">model ${modeled}d ×${factor.toFixed(2)}</span>
+            ${envChip(p)}
+            ${wx}
+            ${volPill}
+          </div>
+        </div>
+        <div class="flex gap-1">
+          <button class="btn small" data-action="water" title="Watered">Water</button>
+          <input type="file" accept="image/*" capture="environment" data-snap hidden />
+          <button class="btn small icon" data-action="snap" title="Snap photo"><i data-lucide="camera"></i></button>
+          <button class="btn small" data-action="open" title="Open">Open</button>
+        </div>
+      </article>
+    `;
   }
 
   async function renderTasks(plants){
@@ -293,6 +343,103 @@
       setTimeout(() => location.reload(), 300);
     });
   }
+
+  // Manual icon refresh
+  const refreshIconsBtn = document.getElementById('refreshIconsBtn');
+  if(refreshIconsBtn){
+    refreshIconsBtn.addEventListener('click', () => {
+      if(window.lucideRender) { window.lucideRender(); showToast('Icons refreshed'); }
+      else showToast('Icon renderer not ready');
+    });
+  }
+
+  // Theme toggle (overrides prefers-color-scheme)
+  const themeToggle = document.getElementById('themeToggle');
+  if(themeToggle){
+    themeToggle.addEventListener('click', () => {
+      const s = getSettings();
+      const cur = s.theme || 'auto';
+      const next = cur === 'dark' ? 'light' : (cur === 'light' ? 'auto' : 'dark');
+      s.theme = next; setSettings(s); applyTheme(); showToast('Theme: ' + next);
+    });
+    applyTheme();
+  }
+  function applyTheme(){
+    const s = getSettings();
+    const t = s.theme || 'auto';
+    const el = document.documentElement;
+    if(t === 'dark'){ el.setAttribute('data-theme','dark'); }
+    else if(t === 'light'){ el.setAttribute('data-theme','light'); }
+    else { el.removeAttribute('data-theme'); }
+    if(window.lucideRender) window.lucideRender();
+  }
+
+  // Plants view (cards/rows)
+  const pvCards = document.getElementById('plantsViewCards');
+  const pvRows = document.getElementById('plantsViewRows');
+  if(pvCards) pvCards.addEventListener('click', async () => { const s=getSettings(); s.plantsView='cards'; setSettings(s); await renderList(); showToast('Plants: cards'); });
+  if(pvRows) pvRows.addEventListener('click', async () => { const s=getSettings(); s.plantsView='rows'; setSettings(s); await renderList(); showToast('Plants: rows'); });
+
+  // Settings modal
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsClose = document.getElementById('settingsClose');
+  function openSettings(){
+    // Pre-fill
+    const s = getSettings();
+    [...document.querySelectorAll('input[name="themeOpt"]')].forEach(r => r.checked = (s.theme||'auto') === r.value);
+    [...document.querySelectorAll('input[name="plantsViewOpt"]')].forEach(r => r.checked = (s.plantsView||'cards') === r.value);
+    document.getElementById('devHeaderToggle').checked = !!s.devHeader;
+    document.getElementById('profileName').value = s.profileName || '';
+    document.getElementById('profileEmoji').value = s.profileEmoji || '';
+    settingsModal.classList.add('show');
+  }
+  function closeSettings(){ settingsModal.classList.remove('show'); }
+  if(settingsBtn) settingsBtn.addEventListener('click', openSettings);
+  if(settingsClose) settingsClose.addEventListener('click', closeSettings);
+  // Apply changes
+  document.querySelectorAll('input[name="themeOpt"]').forEach(r => r.addEventListener('change', () => { const s=getSettings(); s.theme=r.value; setSettings(s); applyTheme(); }));
+  document.querySelectorAll('input[name="plantsViewOpt"]').forEach(r => r.addEventListener('change', async () => { const s=getSettings(); s.plantsView=r.value; setSettings(s); await renderList(); }));
+  const devHeaderToggle = document.getElementById('devHeaderToggle');
+  if(devHeaderToggle) devHeaderToggle.addEventListener('change', () => { const s=getSettings(); s.devHeader=!!devHeaderToggle.checked; setSettings(s); applyDevHeader(); });
+  // Settings shortcuts to actions
+  const settingsSeed = document.getElementById('settingsSeed'); if(settingsSeed) settingsSeed.addEventListener('click', () => document.getElementById('seedBtn')?.click());
+  const settingsUpdate = document.getElementById('settingsUpdate'); if(settingsUpdate) settingsUpdate.addEventListener('click', () => document.getElementById('updateBtn')?.click());
+  const settingsIcons = document.getElementById('settingsIcons'); if(settingsIcons) settingsIcons.addEventListener('click', () => document.getElementById('refreshIconsBtn')?.click());
+  const settingsReminders = document.getElementById('settingsReminders');
+  if(settingsReminders) settingsReminders.addEventListener('click', async () => {
+    const plants = await PlantDB.all();
+    const ics = buildICS(plants);
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'plant-reminders.ics'; document.body.appendChild(a); a.click(); a.remove();
+  });
+  const profileName = document.getElementById('profileName'); if(profileName) profileName.addEventListener('input', () => { const s=getSettings(); s.profileName=profileName.value; setSettings(s); });
+  const profileEmoji = document.getElementById('profileEmoji'); if(profileEmoji) profileEmoji.addEventListener('input', () => { const s=getSettings(); s.profileEmoji=profileEmoji.value; setSettings(s); });
+  const settingsExport = document.getElementById('settingsExport');
+  if(settingsExport) settingsExport.addEventListener('click', () => {
+    const s = getSettings();
+    const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'plant-settings.json'; document.body.appendChild(a); a.click(); a.remove();
+  });
+  const settingsImportInput = document.getElementById('settingsImportInput');
+  if(settingsImportInput) settingsImportInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0]; if(!file) return;
+    try{
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const s = Object.assign(getSettings(), json);
+      setSettings(s);
+      applyTheme(); applyDevHeader(); await renderList();
+      showToast('Settings imported');
+    }catch{ showToast('Invalid settings file'); }
+    e.target.value = '';
+  });
+
+  function applyDevHeader(){
+    const s = getSettings();
+    document.querySelectorAll('.dev-only').forEach(el => el.style.display = s.devHeader ? '' : 'none');
+  }
+  applyDevHeader();
 
   function showToast(msg){
     const t = document.getElementById('toast'); if(!t) return;
@@ -688,7 +835,8 @@
   });
 
   // ICS export for reminders
-  $('#icsBtn').addEventListener('click', async () => {
+  const icsBtn = document.getElementById('icsBtn');
+  if(icsBtn) icsBtn.addEventListener('click', async () => {
     const plants = await PlantDB.all();
     const ics = buildICS(plants);
     const blob = new Blob([ics], { type: 'text/calendar' });
@@ -699,7 +847,8 @@
   });
 
   // Share link sync
-  $('#shareBtn').addEventListener('click', async () => {
+  const shareBtn = document.getElementById('shareBtn');
+  if(shareBtn) shareBtn.addEventListener('click', async () => {
     const payload = await PlantDB.export();
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     const url = `${location.origin}${location.pathname}#sync=${encoded}`;
@@ -1272,6 +1421,9 @@
     if(h.startsWith('#plant/')){
       const id = h.split('/')[1];
       showPlantDetail(id);
+      return;
+    } else if(h === '#plants'){
+      views.showPlantsPage();
       return;
     }
     // default dashboard

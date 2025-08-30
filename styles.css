@@ -9,6 +9,17 @@
   --danger: #ff6b6b;
   --border: #244437;
 }
+[data-theme="dark"]{
+  --bg: #0f1e16;
+  --panel: #15241e;
+  --panel-2: #1a2d25;
+  --ink: #e9f5ef;
+  --muted: #a9c8ba;
+  --accent: #14b893;
+  --accent-2: #62d2b1;
+  --danger: #ff6b6b;
+  --border: #244437;
+}
 
 @media (prefers-color-scheme: light){
   :root{
@@ -22,6 +33,16 @@
     --border: #d7e6df;
   }
 }
+[data-theme="light"]{
+  --bg: #f6faf7;
+  --panel: #ffffff;
+  --panel-2: #ecf4ef;
+  --ink: #0e1512;
+  --muted: #4b6a5b;
+  --accent: #0fa380;
+  --accent-2: #0fb58a;
+  --border: #d7e6df;
+}
 
 *{ box-sizing: border-box }
 html,body{ height:100% }
@@ -29,6 +50,9 @@ body{
   margin:0; font: 16px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, Apple Color Emoji, Segoe UI Emoji;
   color: var(--ink); background: var(--bg);
 }
+.h1, h1{ font-size:1.4rem; font-weight:700; letter-spacing:.2px }
+.h2, h2{ font-size:1.15rem; font-weight:650 }
+.h3, h3{ font-size:1.05rem; font-weight:600 }
 
 .app-header{
   display:flex; align-items:center; justify-content:space-between; gap:1rem;
@@ -44,6 +68,7 @@ body{
 }
 .btn:hover{ transform: translateY(-1px) }
 .btn.primary{ border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); background: var(--accent); color:#08261d }
+.btn:active{ transform: translateY(0) scale(.99) }
 
 .import input + span{ display:inline-block }
 
@@ -91,8 +116,11 @@ main{ padding: 16px; max-width: 900px; margin: 0 auto }
 
 .card{
   background: var(--panel);
-  border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow: 0 1px 0 color-mix(in oklab, var(--bg) 95%, #000);
+  border:1px solid color-mix(in oklab, var(--border) 75%, transparent);
+  border-radius:16px; padding:16px; box-shadow: 0 1px 0 color-mix(in oklab, var(--bg) 94%, #000);
+  transition: box-shadow .15s ease, transform .15s ease, border-color .2s ease;
 }
+.card:hover{ box-shadow: 0 6px 18px color-mix(in oklab, var(--bg) 80%, #000); transform: translateY(-1px) }
 .row{ display:flex; flex-direction:column; gap:6px; margin: 10px 0 }
 label{ color: var(--muted); font-size:.95rem }
 input, select, textarea{

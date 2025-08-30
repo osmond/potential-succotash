@@ -15,12 +15,15 @@
       <h1>Plant Tracker</h1>
       <nav class="top-actions flex gap-2">
         <button id="addPlantBtn" class="btn primary px-3 py-2 rounded-xl">Add Plant</button>
-        <button id="seedBtn" class="btn px-3 py-2 rounded-xl">Add Demo</button>
-        <button id="icsBtn" class="btn px-3 py-2 rounded-xl">Reminders (.ics)</button>
-        <button id="shareBtn" class="btn px-3 py-2 rounded-xl">Share</button>
+        <button id="navPlants" class="btn px-3 py-2 rounded-xl" title="All plants">Plants</button>
+        <button id="seedBtn" class="btn px-3 py-2 rounded-xl dev-only" style="display:none">Add Demo</button>
+        
         <button id="exportBtn" class="btn px-3 py-2 rounded-xl">Export</button>
-        <button id="updateBtn" class="btn px-3 py-2 rounded-xl" title="Force update service worker and refresh">Update</button>
-        <a href="/health.html" class="btn px-3 py-2 rounded-xl" target="_blank" rel="noreferrer noopener">Health</a>
+        <button id="updateBtn" class="btn px-3 py-2 rounded-xl dev-only" style="display:none" title="Force update service worker and refresh">Update</button>
+        <button id="themeToggle" class="btn px-3 py-2 rounded-xl" title="Toggle theme"><i data-lucide="sun"></i></button>
+        <button id="refreshIconsBtn" class="btn px-3 py-2 rounded-xl dev-only" style="display:none" title="Re-render icons">Icons</button>
+        <a href="/health.html" class="btn px-3 py-2 rounded-xl dev-only" style="display:none" target="_blank" rel="noreferrer noopener">Health</a>
+        <button id="settingsBtn" class="btn px-3 py-2 rounded-xl" title="Settings"><i data-lucide="settings"></i></button>
         <label class="import">
           <input id="importInput" type="file" accept="application/json" hidden />
           <span class="btn px-3 py-2 rounded-xl">Import</span>
@@ -30,33 +33,6 @@
 
     <main id="view-root">
       <section id="dashboardView" class="view active">
-        <section id="sciencePanel" class="card science">
-          <div class="science-grid">
-            <div>
-              <div class="label">Season</div>
-              <select id="seasonSelect" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)">
-                <option value="growing" selected>Growing</option>
-                <option value="peak">Peak</option>
-                <option value="dormant">Dormant</option>
-              </select>
-            </div>
-            <div>
-              <div class="label">Temp (°C)</div>
-              <input id="tempInput" type="number" step="0.1" placeholder="22" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)" />
-            </div>
-            <div>
-              <div class="label">RH (%)</div>
-              <input id="rhInput" type="number" step="1" placeholder="50" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)" />
-            </div>
-            <div>
-              <div class="label">Model</div>
-              <div id="modelSummary" class="muted">—</div>
-            </div>
-          </div>
-          <div class="actions" style="margin-top:.5rem; justify-content:flex-start">
-            <button id="useWeather" class="btn px-3 py-2 rounded-xl" title="Fetch current Temp/RH from your location">Use Local Weather</button>
-          </div>
-        </section>
         <div class="toolbar flex items-end justify-between">
           <div>
             <h2 class="m-0">Tasks</h2>
@@ -100,12 +76,41 @@
           <h3 style="margin:8px 0 4px">Upcoming</h3>
           <ul id="upcomingList" class="plant-list grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
         </div>
-        <div class="toolbar" style="margin-top:16px">
-          <h2>Plants</h2>
+        <div class="toolbar flex items-end justify-between" style="margin-top:16px">
+          <h2 class="m-0">Plants</h2>
+          <div class="flex gap-2 items-center">
+            <div class="flex rounded-xl overflow-hidden border" style="border-color: var(--border)">
+              <button id="plantsViewCards" class="px-3 py-2 btn">Cards</button>
+              <button id="plantsViewRows" class="px-3 py-2 btn">Rows</button>
+            </div>
+          </div>
         </div>
         <div id="plantsSection">
           <ul id="plantList" class="plant-list grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
         </div>
+      </section>
+
+      <!-- All Plants Page -->
+      <section id="plantsPage" class="view">
+        <div class="toolbar flex items-end justify-between">
+          <div>
+            <h2 class="m-0">All Plants</h2>
+            <div class="hint">Browse and manage your collection</div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <input id="plantSearch" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)" placeholder="Search plants" />
+            <select id="plantSort" class="px-2 py-2 rounded-xl border" style="border-color: var(--border)">
+              <option value="name">Name (A–Z)</option>
+              <option value="due">Next due</option>
+              <option value="created">Recently added</option>
+            </select>
+            <div class="flex rounded-xl overflow-hidden border" style="border-color: var(--border)">
+              <button id="plantsPageCards" class="px-3 py-2 btn">Cards</button>
+              <button id="plantsPageRows" class="px-3 py-2 btn">Rows</button>
+            </div>
+          </div>
+        </div>
+        <ul id="allPlantList" class="plant-list grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
       </section>
 
       <div id="toast" class="toast"></div>
@@ -320,6 +325,99 @@
       <span>Local-first, offline-ready</span>
     </footer>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+      <div class="modal-content card" style="max-width:680px">
+        <div class="modal-header">
+          <h3 class="m-0">Settings</h3>
+          <button id="settingsClose" class="btn ghost">Close</button>
+        </div>
+        <div class="row">
+          <label class="h3">User</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="card">
+              <div class="muted mb-1">Theme</div>
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-1"><input type="radio" name="themeOpt" value="auto" checked> Auto</label>
+              <label class="flex items-center gap-1"><input type="radio" name="themeOpt" value="dark"> Dark</label>
+              <label class="flex items-center gap-1"><input type="radio" name="themeOpt" value="light"> Light</label>
+            </div>
+          </div>
+          <div class="card">
+            <div class="muted mb-1">Plants View</div>
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-1"><input type="radio" name="plantsViewOpt" value="cards" checked> Cards</label>
+              <label class="flex items-center gap-1"><input type="radio" name="plantsViewOpt" value="rows"> Rows</label>
+            </div>
+          </div>
+          <div class="card md:col-span-2">
+            <div class="muted mb-1">Actions</div>
+            <div class="flex flex-wrap gap-2">
+              <button id="settingsReminders" class="btn px-3 py-2 rounded-xl">Download Reminders (.ics)</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <label class="h3">Science</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="card">
+              <div class="muted mb-1">Season</div>
+              <select id="seasonSelect" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)">
+                <option value="growing" selected>Growing</option>
+                <option value="peak">Peak</option>
+                <option value="dormant">Dormant</option>
+              </select>
+            </div>
+            <div class="card">
+              <div class="muted mb-1">Environment</div>
+              <div class="grid grid-cols-2 gap-2">
+                <input id="tempInput" type="number" step="0.1" placeholder="Temp °C" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)" />
+                <input id="rhInput" type="number" step="1" placeholder="RH %" class="px-3 py-2 rounded-xl border" style="border-color: var(--border)" />
+              </div>
+              <div class="muted mt-1">Model: <span id="modelSummary">—</span></div>
+              <div class="actions" style="margin-top:.5rem; justify-content:flex-start">
+                <button id="useWeather" class="btn px-3 py-2 rounded-xl" title="Fetch current Temp/RH from your location">Use Local Weather</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label class="h3">Profile</label>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="card">
+            <div class="muted mb-1">Display Name</div>
+            <input id="profileName" class="px-3 py-2 rounded-xl border" placeholder="Your name" />
+          </div>
+          <div class="card">
+            <div class="muted mb-1">Avatar Emoji</div>
+            <input id="profileEmoji" class="px-3 py-2 rounded-xl border" placeholder="e.g., 🌿" maxlength="4" />
+          </div>
+          <div class="card md:col-span-2">
+            <div class="muted mb-1">Settings Backup</div>
+            <div class="flex flex-wrap gap-2 items-center">
+              <button id="settingsExport" class="btn px-3 py-2 rounded-xl">Export Settings</button>
+              <label class="btn px-3 py-2 rounded-xl" for="settingsImportInput">Import Settings</label>
+              <input id="settingsImportInput" type="file" accept="application/json" hidden />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label class="h3">Developer</label>
+        <div class="card">
+          <div class="flex flex-wrap gap-2 items-center">
+            <label class="flex items-center gap-1"><input id="devHeaderToggle" type="checkbox"> Show dev tools in header</label>
+            <button id="settingsSeed" class="btn">Add Demo</button>
+            <button id="settingsUpdate" class="btn">Update</button>
+            <button id="settingsIcons" class="btn">Icons</button>
+            <a href="/health.html" class="btn" target="_blank" rel="noreferrer noopener">Health</a>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+
     <script src="db.js"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
@@ -327,6 +425,24 @@
       import { createIcons, icons } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
       window.lucideRender = () => createIcons({ icons });
       window.lucideRender();
+    </script>
+    <script>
+      (function(){
+        function ready(){ return typeof window.lucideRender === 'function'; }
+        if(ready()) return;
+        setTimeout(() => {
+          if(ready()) return window.lucideRender();
+          var s = document.createElement('script');
+          s.src = 'https://unpkg.com/lucide@latest';
+          s.onload = function(){
+            if(window.lucide && window.lucide.createIcons){
+              window.lucideRender = function(){ window.lucide.createIcons(); };
+              window.lucideRender();
+            }
+          };
+          document.body.appendChild(s);
+        }, 800);
+      })();
     </script>
   </body>
   <script>
