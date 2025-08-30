@@ -70,6 +70,16 @@
     currentStep = n;
     const steps = $$('#editorSteps .step');
     steps.forEach((s,i) => s.classList.toggle('hidden', i+1 !== n));
+    const prog = document.getElementById('stepIndicator');
+    if(prog){
+      const pct = (n / steps.length) * 100;
+      prog.setAttribute('aria-valuemax', String(steps.length));
+      prog.setAttribute('aria-valuenow', String(n));
+      prog.setAttribute('aria-valuetext', `Step ${n} of ${steps.length}`);
+      prog.setAttribute('aria-label', `Step ${n} of ${steps.length}`);
+      const bar = prog.querySelector('.bar');
+      if(bar) bar.style.width = pct + '%';
+    }
     if(n === 5) updateConfirm();
   }
   function updateConfirm(){
