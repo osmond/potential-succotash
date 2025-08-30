@@ -27,6 +27,7 @@ export default function PlantCard({ plant, hydration, compact = false, children 
         <HydrationRing percentage={hydration} size={ringSize} />
         {children}
       </div>
+
     </div>
   );
 }
