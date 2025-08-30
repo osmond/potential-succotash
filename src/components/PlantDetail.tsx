@@ -75,6 +75,8 @@ export interface PlantDetailProps {
   onWater?: () => void | Promise<void>;
   /** Callback when a photo is added */
   onPhoto?: (file: File) => void | Promise<void>;
+  /** Callback when care plan is adjusted */
+  onAdjustPlan?: () => void | Promise<void>;
 }
 
 const size = 120;
@@ -88,6 +90,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   metrics,
   onWater,
   onPhoto,
+  onAdjustPlan,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [dashOffset, setDashOffset] = useState(circumference);
@@ -102,13 +105,13 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const [suggestions, setSuggestions] = useState(
     [
       {
-        id: "increase-water",
-        message: "Soil moisture is low. Consider increasing watering.",
+        id: "mark-watered",
+        message: "Soil moisture is low. Consider watering.",
         action: "Mark as Watered",
       },
       {
-        id: "adjust-fertilizer",
-        message: "Nutrient levels appear low. Consider adjusting fertilizer.",
+        id: "adjust-care",
+        message: "Nutrient levels appear low. Adjust care plan.",
         action: "Adjust Care Plan",
       },
     ]
@@ -216,16 +219,20 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
     }
   };
 
-  const handleSuggestion = (id: string) => {
+  const applySuggestion = async (id: string) => {
     const now = new Date().toISOString();
-    if (id === "increase-water") {
+    if (id === "mark-watered") {
       setHydrationStatus((h) => ({
         ...h,
         level: Math.min(h.level + 10, 100),
         lastWatered: now,
       }));
+      setHistoryState((h) => [...h, { type: "water", at: now }]);
+      if (onWater) await onWater();
+    } else if (id === "adjust-care") {
+      setHistoryState((h) => [...h, { type: "adjust-care", at: now }]);
+      if (onAdjustPlan) await onAdjustPlan();
     }
-    setHistoryState((h) => [...h, { type: id, at: now }]);
     setSuggestions((s) => s.filter((sg) => sg.id !== id));
   };
 
@@ -367,17 +374,22 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
         )}
       </div>
 
-      {suggestions.map((s) => (
-        <div key={s.id} className="mt-4 p-4 bg-blue-50 rounded-lg shadow">
-          <p className="mb-2 text-sm text-gray-700">{s.message}</p>
-          <button
-            className="px-3 py-2 text-sm font-medium text-white bg-green-600 rounded"
-            onClick={() => handleSuggestion(s.id)}
-          >
-            {s.action}
-          </button>
+      {suggestions.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-semibold mb-2">Care Coach</h3>
+          {suggestions.map((s) => (
+            <div key={s.id} className="mb-4 p-4 bg-blue-50 rounded-lg shadow">
+              <p className="mb-2 text-sm text-gray-700">{s.message}</p>
+              <button
+                className="px-3 py-2 text-sm font-medium text-white bg-green-600 rounded"
+                onClick={() => applySuggestion(s.id)}
+              >
+                {s.action}
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
       <button
         onClick={() => setExpanded((v) => !v)}
@@ -451,22 +463,29 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
           <div>
             <h3 className="font-semibold mb-2">Observations</h3>
             <div className="grid grid-cols-3 gap-2">
-              {photos.map((url, idx) => (
-                <img
-                  key={idx}
-                  src={url}
-                  className="w-full h-24 object-cover rounded"
-                />
-              ))}
-              <label className="w-full h-24 bg-gray-100 flex items-center justify-center rounded cursor-pointer">
-                <span className="text-gray-400 text-2xl">+</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handlePhotoUpload}
-                />
-              </label>
+              {Array.from({ length: 9 }).map((_, i) => {
+                const url = photos[i];
+                return url ? (
+                  <img
+                    key={i}
+                    src={url}
+                    className="w-full h-24 object-cover rounded"
+                  />
+                ) : (
+                  <label
+                    key={i}
+                    className="w-full h-24 bg-gray-100 flex items-center justify-center rounded cursor-pointer"
+                  >
+                    <Camera className="w-8 h-8 text-gray-400" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoUpload}
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
