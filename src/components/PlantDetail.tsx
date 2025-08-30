@@ -97,6 +97,8 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const [dataPanelOpen, setDataPanelOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState<Record<string, boolean>>({});
   const [historyState, setHistoryState] = useState<PlantEvent[]>(plant.history || []);
+  const [timelineEvents, setTimelineEvents] = useState<{ date: string; events: PlantEvent[] }[]>([]);
+  const [wateringData, setWateringData] = useState<{ date: string; amount: number }[]>([]);
   const [suggestions, setSuggestions] = useState(
     [
       {
@@ -145,6 +147,36 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   useEffect(() => {
     setHistoryState(plant.history || []);
   }, [plant.history]);
+
+  useEffect(() => {
+    const groups: Record<string, PlantEvent[]> = {};
+    for (const ev of historyState) {
+      const date = ev.at.slice(0, 10);
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(ev);
+    }
+    const grouped = Object.entries(groups)
+      .sort((a, b) => Date.parse(b[0]) - Date.parse(a[0]))
+      .map(([date, events]) => ({
+        date,
+        events: events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)),
+      }));
+    setTimelineEvents(grouped);
+
+    const today = new Date();
+    const data: { date: string; amount: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      const label = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const amount = (groups[iso] || [])
+        .filter((e) => e.type === "water" && typeof e.amount === "number")
+        .reduce((sum, e) => sum + (e.amount || 0), 0);
+      data.push({ date: label, amount });
+    }
+    setWateringData(data);
+  }, [historyState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,25 +276,11 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
     },
   ];
 
-  const timeline = historyState
-    .slice()
-    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const eventIcons: Record<string, React.ComponentType<any>> = {
     water: Droplet,
     fertilize: FlaskConical,
     observe: Camera,
   };
-
-  const wateringData = historyState
-    .filter((h) => h.type === "water" && typeof h.amount === "number")
-    .slice(-7)
-    .map((h) => ({
-      date: new Date(h.at).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
-      amount: h.amount as number,
-    }));
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6 max-w-sm mx-auto">
@@ -401,22 +419,31 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
             </div>
           )}
 
-          {timeline.length > 0 && (
+          {timelineEvents.length > 0 && (
             <div>
               <h3 className="font-semibold mb-2">Care Timeline</h3>
-              <ul className="space-y-2">
-                {timeline.map((h, i) => {
-                  const Icon = eventIcons[h.type] || Activity;
-                  return (
-                    <li key={i} className="flex items-center">
-                      <Icon className="w-4 h-4 mr-2" />
-                      <span className="capitalize">{h.type}</span>
-                      <span className="ml-auto text-xs text-gray-500">
-                        {new Date(h.at).toLocaleDateString()}
-                      </span>
-                    </li>
-                  );
-                })}
+              <ul className="space-y-4">
+                {timelineEvents.map((group, i) => (
+                  <li key={i}>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {new Date(group.date).toLocaleDateString()}
+                    </div>
+                    <ul className="space-y-1">
+                      {group.events.map((ev, j) => {
+                        const Icon = eventIcons[ev.type] || Activity;
+                        return (
+                          <li key={j} className="flex items-center">
+                            <Icon className="w-4 h-4 mr-2" />
+                            <span className="capitalize">{ev.type}</span>
+                            {typeof ev.amount === "number" && (
+                              <span className="ml-2 text-xs text-gray-500">{ev.amount} ml</span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                ))}
               </ul>
             </div>
           )}
