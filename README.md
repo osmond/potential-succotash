@@ -21,7 +21,7 @@ Open `index.html` in a modern browser. No build step required.
    ```bash
    npm run dev
    ```
-   Serves the repo root on `http://localhost:5173` (or `PORT` if set) and auto‑opens `health.html` in your browser.
+   Runs the Vite dev server at `http://localhost:5173` (or `PORT` if set). Open `index.html` or `health.html` in your browser.
 3. **Iterate**
    - Edit any `.html`, `.css`, or `.js` file; refresh the browser to see changes.
    - Run `npm run build` if you need to regenerate `tailwind.css`.
