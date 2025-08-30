@@ -976,61 +976,87 @@
   })();
 
   // Details modal with chart
-  // Full-page detail view
+  // Full-page detail view rendered via React component
   async function showPlantDetail(id){
     const plant = await PlantDB.get(id);
     if(!plant){ location.hash = ''; return; }
     $('#dashboardView').classList.remove('active');
     $('#editorView').classList.remove('active');
-    $('#plantDetailView').classList.add('active');
-    // Header
-    $('#plantDetailTitle').textContent = plant.name || 'Plant';
-    $('#plantDetailTaxon').textContent = taxonLine(plant);
-    // Cover
-    const cover = $('#plantDetailCover'); cover.style.backgroundImage = '';
-    const photos = (plant.observations||[]).filter(o=>o.type==='photo'&&o.fileId).sort((a,b)=> (a.at<b.at?1:-1));
-    if(plant.coverFileId) photos.unshift({fileId: plant.coverFileId});
-    if(photos[0]){
-      const blob = await PlantDB.getFile(photos[0].fileId); if(blob){ cover.style.backgroundImage = `url('${URL.createObjectURL(blob)}')`; }
-    }
-    // Stats
-    const s = getSettings();
-      const modeled = Math.round((plant.intervalDays || plant.carePlan?.intervalDays || plant.baseIntervalDays || 7) * intervalMultiplier(plant.potSize || potCategoryFromInches(plant.potSizeIn)) * seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100)));
-    const factor = seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100));
-    const water = waterPill(plant);
-    const dueTxt = humanDue(nextDueFrom(plant));
-    const stats = $('#plantDetailStats');
-    stats.innerHTML = `<span class="pill">model ${modeled}d ×${factor.toFixed(2)}</span> ${water} <span class="pill ${dueClass(nextDueFrom(plant))}">${escapeHtml(dueTxt)}</span>`;
-    // Actions
+    const view = $('#plantDetailView');
+    view.classList.add('active');
+    view.innerHTML = `
+      <div class="toolbar" style="justify-content:space-between; align-items:center">
+        <button id="detailBack" class="btn">Back</button>
+        <button id="detailEdit" class="btn">Edit</button>
+      </div>
+      <div id="detailRoot"></div>
+    `;
     $('#detailBack').onclick = () => { location.hash = ''; };
     $('#detailEdit').onclick = () => { views.showEditor(plant); location.hash = '#editor'; };
-    $('#detailWater').onclick = async () => { plant.lastWatered = todayISO(); plant.history = plant.history||[]; plant.history.push({type:'water', at: todayISO()}); await PlantDB.put(plant); showPlantDetail(plant.id); };
-    $('#detailSnap').onclick = () => $('#detailSnapInput').click();
-    $('#detailSnapInput').onchange = async (e) => { const f = e.target.files?.[0]; if(!f) return; const resized = await resizeImage(f,1600); const obs={id:cryptoRandomId(),at:new Date().toISOString(),type:'photo',fileId:await PlantDB.putFile(resized)}; plant.observations=plant.observations||[]; plant.observations.push(obs); await PlantDB.put(plant); showPlantDetail(plant.id); };
-    // Observations
-    await renderObsListFor($('#detailObsList'), plant);
-    $('#detailObsAdd').onclick = async () => {
-      const noteEl=$('#detailObsNote'); const fileEl=$('#detailObsPhoto'); const obs={id:cryptoRandomId(),at:new Date().toISOString(),note:noteEl.value.trim(),type:'note'}; if(fileEl.files&&fileEl.files[0]){const resized=await resizeImage(fileEl.files[0],1600); obs.type='photo'; obs.fileId=await PlantDB.putFile(resized);} plant.observations=plant.observations||[]; plant.observations.push(obs); plant.history=plant.history||[]; plant.history.push({type:'observe', at: obs.at}); await PlantDB.put(plant); noteEl.value=''; fileEl.value=''; renderObsListFor($('#detailObsList'), plant);
-    };
-    // Tasks
-    renderTasksChipsFor($('#detailTaskList'), plant);
-    // Notes
-    $('#detailNotes').textContent = plant.notes || '';
-    // Weather
-    const wxEl = $('#plantDetailWx');
-    if(plant.weatherOverride){
-      const t = Math.round(plant.weatherOverride.tempC);
-      const h = Math.round(plant.weatherOverride.rh);
-      const age = plant.weatherOverride.fetchedAt ? relTime(plant.weatherOverride.fetchedAt) : '';
-      wxEl.textContent = `wx ${t}°C / ${h}%${age ? ' • ' + age : ''}`;
-      wxEl.style.display = '';
-    }else{
-      wxEl.textContent = '';
-      wxEl.style.display = 'none';
+
+    async function ensureReact(){
+      while(!(window.React && window.ReactDOM && window.PlantDetail)){
+        await new Promise(r => setTimeout(r,50));
+      }
+      return { React: window.React, ReactDOM: window.ReactDOM, PlantDetail: window.PlantDetail };
     }
-    // Chart
-    drawHistory($('#detailChart'), plant);
-    if(window.lucideRender) window.lucideRender();
+    const { React, ReactDOM, PlantDetail } = await ensureReact();
+    const mount = document.getElementById('detailRoot');
+    const root = ReactDOM.createRoot(mount);
+
+    let coverURL = null;
+    if(plant.coverFileId){
+      const blob = await PlantDB.getFile(plant.coverFileId);
+      if(blob) coverURL = URL.createObjectURL(blob);
+    }
+
+    function hydrationPct(p){
+      const last = parseDate(p.lastWatered || todayISO());
+      const next = parseDate(nextDueFrom(p));
+      const total = daysBetween(last, next);
+      if(total <= 0) return 0;
+      const used = daysBetween(last, new Date());
+      return Math.max(0, Math.min(100, Math.round((total - used)/total*100)));
+    }
+
+    function render(){
+      const hydration = { level: hydrationPct(plant), lastWatered: plant.lastWatered };
+      const plantMeta = {
+        name: plant.name || 'Plant',
+        species: taxonLine(plant),
+        location: plant.location,
+        imageUrl: coverURL || undefined,
+        history: plant.history || [],
+        observations: plant.observations || [],
+      };
+      const metrics = {
+        temperature: plant.weatherOverride?.tempC,
+        humidity: plant.weatherOverride?.rh,
+      };
+      root.render(React.createElement(PlantDetail, {
+        plant: plantMeta,
+        hydration,
+        metrics,
+        onWater: async () => {
+          plant.lastWatered = todayISO();
+          plant.history = plant.history || [];
+          plant.history.push({ type: 'water', at: todayISO() });
+          await PlantDB.put(plant);
+          render();
+        },
+        onPhoto: async (file) => {
+          const resized = await resizeImage(file,1600);
+          const obs={id:cryptoRandomId(),at:new Date().toISOString(),type:'photo',fileId:await PlantDB.putFile(resized)};
+          plant.observations=plant.observations||[];
+          plant.observations.push(obs);
+          plant.history=plant.history||[];
+          plant.history.push({type:'observe', at: obs.at});
+          await PlantDB.put(plant);
+          render();
+        }
+      }));
+    }
+    render();
   }
 
   function drawHistory(canvas, plant){
