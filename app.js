@@ -687,24 +687,55 @@
     });
 
     // Location selection
-    $$('#locationChips [data-loc]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        stepData.location = btn.dataset.loc;
-        $$('#locationChips [data-loc]').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
+    function selectLocation(btn){
+      stepData.location = btn.dataset.loc;
+      $$('#locationChips .chip').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      fetchWeather();
+    }
+    function setupChip(btn){
+      btn.addEventListener('click', () => selectLocation(btn));
+      btn.addEventListener('dblclick', () => {
+        const newName = prompt('Edit location', btn.dataset.loc);
+        if(newName){
+          btn.dataset.loc = newName;
+          btn.textContent = newName;
+          if(btn.classList.contains('selected')){
+            stepData.location = newName;
+            fetchWeather();
+          }
+        }
       });
-    });
+    }
+    $$('#locationChips [data-loc]').forEach(setupChip);
+    const locInput = document.getElementById('newLocationInput');
+    if(locInput){
+      locInput.addEventListener('keydown', e => {
+        if(e.key === 'Enter'){
+          const val = locInput.value.trim();
+          if(val){
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'chip';
+            chip.dataset.loc = val;
+            chip.textContent = val;
+            setupChip(chip);
+            const container = document.getElementById('locationChips');
+            container.insertBefore(chip, locInput);
+            locInput.value = '';
+            chip.click();
+          }
+        }
+      });
+    }
     document.getElementById('isOutdoor').addEventListener('change', e => {
       stepData.inout = e.target.checked ? 'outdoor' : 'indoor';
+      fetchWeather();
     });
 
-    // Pot & soil inputs
-    document.getElementById('potSize').addEventListener('change', e => { stepData.potSizeIn = parseInt(e.target.value,10); });
-    document.getElementById('soilType').addEventListener('change', e => { stepData.soilType = e.target.value; });
-    document.getElementById('hasDrain').addEventListener('change', e => { stepData.hasDrain = e.target.checked; });
-
-    // Weather fetch
-    document.getElementById('fetchWeather').addEventListener('click', async () => {
+    async function fetchWeather(){
+      const tag = document.getElementById('weatherTag');
+      if(tag) tag.textContent = 'Fetching weather…';
       try{
         const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej));
         const lat = pos.coords.latitude; const lon = pos.coords.longitude;
@@ -714,14 +745,20 @@
         if(!Number.isFinite(t) || !Number.isFinite(h)) throw new Error('weather');
         if(!stepData.inout || stepData.inout === 'indoor'){ t -= 2; h = Math.min(100, h + 10); }
         stepData.weatherOverride = { tempC: t, rh: h, fetchedAt: new Date().toISOString() };
-        const tag = document.getElementById('weatherTag');
-        tag.textContent = `Weather: ${Math.round(t)}°C / ${Math.round(h)}%`;
-      }catch{ alert('Location permission or network failed'); }
-    });
+        if(tag) tag.textContent = `Weather: ${Math.round(t)}°C / ${Math.round(h)}%`;
+      }catch{
+        if(tag) tag.textContent = 'Weather unavailable';
+      }
+    }
     document.getElementById('clearWeather').addEventListener('click', () => {
       stepData.weatherOverride = null;
       const tag = document.getElementById('weatherTag'); if(tag) tag.textContent = '';
     });
+
+    // Pot & soil inputs
+    document.getElementById('potSize').addEventListener('change', e => { stepData.potSizeIn = parseInt(e.target.value,10); });
+    document.getElementById('soilType').addEventListener('change', e => { stepData.soilType = e.target.value; });
+    document.getElementById('hasDrain').addEventListener('change', e => { stepData.hasDrain = e.target.checked; });
 
     // Care plan generation
     document.getElementById('genCarePlan').addEventListener('click', async () => {
