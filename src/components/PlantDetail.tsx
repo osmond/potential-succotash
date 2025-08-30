@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Droplet,
   Sun,
@@ -8,6 +8,8 @@ import {
   FlaskConical,
   Camera,
   Activity,
+  Plus,
+  X,
 } from "lucide-react";
 import {
   BarChart,
@@ -73,11 +75,40 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
   const [expanded, setExpanded] = useState(false);
   const [dashOffset, setDashOffset] = useState(circumference);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [hydrationState, setHydrationState] = useState(hydration);
+  const [historyState, setHistoryState] = useState<PlantEvent[]>(plant.history || []);
+  const [suggestions, setSuggestions] = useState(
+    [
+      {
+        id: "increase-water",
+        message: "Soil moisture is low. Consider increasing watering.",
+        action: "Mark as Watered",
+      },
+      {
+        id: "adjust-fertilizer",
+        message: "Nutrient levels appear low. Consider adjusting fertilizer.",
+        action: "Adjust Care Plan",
+      },
+    ]
+  );
+  const [fabOpen, setFabOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fabClassName = fabOpen
+    ? "opacity-100 translate-y-0"
+    : "opacity-0 translate-y-4 pointer-events-none";
 
   useEffect(() => {
-    const progress = Math.min(Math.max(hydration.level, 0), 100) / 100;
+    const progress = Math.min(Math.max(hydrationState.level, 0), 100) / 100;
     setDashOffset(circumference - progress * circumference);
-  }, [hydration.level]);
+  }, [hydrationState.level]);
+
+  useEffect(() => {
+    setHydrationState(hydration);
+  }, [hydration]);
+
+  useEffect(() => {
+    setHistoryState(plant.history || []);
+  }, [plant.history]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,13 +144,45 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
     }
   };
 
+  const handleSuggestion = (id: string) => {
+    const now = new Date().toISOString();
+    if (id === "increase-water") {
+      setHydrationState((h) => ({
+        ...h,
+        level: Math.min(h.level + 10, 100),
+        lastWatered: now,
+      }));
+    }
+    setHistoryState((h) => [...h, { type: id, at: now }]);
+    setSuggestions((s) => s.filter((sg) => sg.id !== id));
+  };
+
+  const handleAddWater = () => {
+    const now = new Date().toISOString();
+    setHydrationState((h) => ({
+      ...h,
+      level: Math.min(h.level + 10, 100),
+      lastWatered: now,
+    }));
+    setHistoryState((h) => [...h, { type: "water", at: now }]);
+  };
+
+  const handleAddFertilizer = () => {
+    const now = new Date().toISOString();
+    setHistoryState((h) => [...h, { type: "fertilize", at: now }]);
+  };
+
+  const handleFabPhoto = () => {
+    fileInputRef.current?.click();
+  };
+
   const stats = [
     { icon: Sun, label: "Sun", value: metrics.sunlight ? `${metrics.sunlight}h` : "--" },
     { icon: Thermometer, label: "Temp", value: metrics.temperature ? `${metrics.temperature}°C` : "--" },
     { icon: Droplet, label: "Humidity", value: metrics.humidity ? `${metrics.humidity}%` : "--" },
   ];
 
-  const timeline = (plant.history || [])
+  const timeline = historyState
     .slice()
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const eventIcons: Record<string, React.ComponentType<any>> = {
@@ -128,7 +191,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
     observe: Camera,
   };
 
-  const wateringData = (plant.history || [])
+  const wateringData = historyState
     .filter((h) => h.type === "water" && typeof h.amount === "number")
     .slice(-7)
     .map((h) => ({
@@ -183,7 +246,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xl font-bold">{hydration.level}%</span>
+          <span className="text-xl font-bold">{hydrationState.level}%</span>
         </div>
       </div>
 
@@ -196,6 +259,18 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
           </div>
         ))}
       </div>
+
+      {suggestions.map((s) => (
+        <div key={s.id} className="mt-4 p-4 bg-blue-50 rounded-lg shadow">
+          <p className="mb-2 text-sm text-gray-700">{s.message}</p>
+          <button
+            className="px-3 py-2 text-sm font-medium text-white bg-green-600 rounded"
+            onClick={() => handleSuggestion(s.id)}
+          >
+            {s.action}
+          </button>
+        </div>
+      ))}
 
       <button
         onClick={() => setExpanded((v) => !v)}
@@ -216,9 +291,9 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
               <span className="font-medium">Location:</span> {plant.location}
             </p>
           )}
-          {hydration.lastWatered && (
+          {hydrationState.lastWatered && (
             <p>
-              <span className="font-medium">Last watered:</span> {hydration.lastWatered}
+              <span className="font-medium">Last watered:</span> {hydrationState.lastWatered}
             </p>
           )}
 
@@ -280,6 +355,45 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
           </div>
         </div>
       )}
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className={`flex flex-col items-center mb-4 transition-all duration-300 ${fabClassName}`}>
+          <button
+            onClick={handleAddWater}
+            className="mb-2 p-3 rounded-full bg-blue-500 text-white shadow-lg"
+            aria-label="Add water"
+          >
+            <Droplet className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleAddFertilizer}
+            className="mb-2 p-3 rounded-full bg-green-500 text-white shadow-lg"
+            aria-label="Add fertilizer"
+          >
+            <FlaskConical className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleFabPhoto}
+            className="mb-2 p-3 rounded-full bg-yellow-500 text-white shadow-lg"
+            aria-label="Add photo"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+        </div>
+        <button
+          onClick={() => setFabOpen((o) => !o)}
+          className="p-4 rounded-full bg-green-600 text-white shadow-lg transition-transform duration-300"
+          aria-label="Toggle actions"
+        >
+          {fabOpen ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+        </button>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          onChange={handlePhotoUpload}
+          className="hidden"
+        />
+      </div>
     </div>
   );
 };
