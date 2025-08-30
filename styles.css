@@ -152,3 +152,6 @@ input, select, textarea{
 .group-header{ list-style:none; margin: 8px 4px; color: var(--muted); font-weight:600 }
 
 .toast{ position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--panel); color: var(--ink); border:1px solid var(--border); padding:8px 12px; border-radius:12px; display:none; z-index: 9999 }
+
+.step-progress{ margin-bottom:12px; height:8px; background: var(--panel-2); border:1px solid var(--border); border-radius:999px; overflow:hidden }
+.step-progress .bar{ height:100%; width:20%; background: var(--accent); transition:width .2s ease }
