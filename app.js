@@ -10,24 +10,27 @@
   const fmtDate = (d) => d.toISOString().slice(0,10);
   const daysBetween = (a,b) => Math.round((b - a)/86400000);
 
-  // Nerdy: derive watering multiplier from light + pot size
-  function intervalMultiplier(lightLevel, potSize){
-    let light = 1.0; // baseline
-    if(lightLevel === 'low') light = 1.15; // water less often
-    if(lightLevel === 'medium') light = 1.0;
-    if(lightLevel === 'high') light = 0.8; // water more often
+    // Nerdy: derive watering multiplier from pot size category
+    function intervalMultiplier(potSize){
+      let pot = 1.0;
+      if(potSize === 'small') pot = 0.85; // dries faster
+      if(potSize === 'medium') pot = 1.0;
+      if(potSize === 'large') pot = 1.1; // dries slower
+      if(potSize === 'tiny') pot = 0.7;
+      if(potSize === 'huge') pot = 1.25;
+      return Math.max(0.5, Math.min(1.5, pot));
+    }
 
-    let pot = 1.0;
-    if(potSize === 'small') pot = 0.85; // dries faster
-    if(potSize === 'medium') pot = 1.0;
-    if(potSize === 'large') pot = 1.1; // dries slower
+    function potCategoryFromInches(inches){
+      if(!inches) return 'medium';
+      if(inches <= 4) return 'small';
+      if(inches >= 10) return 'large';
+      return 'medium';
+    }
 
-    return Math.max(0.5, Math.min(1.5, light * pot));
-  }
-
-  function nextDueFrom(plant){
-    const base = Math.max(1, Number(plant.baseIntervalDays || 7));
-    const mult = intervalMultiplier(plant.lightLevel, plant.potSize);
+    function nextDueFrom(plant){
+      const base = Math.max(1, Number(plant.intervalDays || plant.carePlan?.intervalDays || plant.baseIntervalDays || 7));
+      const mult = intervalMultiplier(plant.potSize || potCategoryFromInches(plant.potSizeIn));
     const s = getSettings();
     const seasonal = seasonalMultiplier(s);
     const micro = microEnvironmentMultiplier(plant);
@@ -61,6 +64,24 @@
     return 'ok';
   }
 
+  let currentStep = 1;
+  const stepData = {};
+  function showStep(n){
+    currentStep = n;
+    const steps = $$('#editorSteps .step');
+    steps.forEach((s,i) => s.classList.toggle('hidden', i+1 !== n));
+    if(n === 5) updateConfirm();
+  }
+  function updateConfirm(){
+    const sum = $('#confirmSummary');
+    if(!sum) return;
+    const name = $('#plantName').value.trim();
+    const plan = stepData.carePlan;
+    const water = plan ? `${plan.waterMl} ml (${(plan.waterMl*0.033814).toFixed(1)} oz)` : '—';
+    const every = plan ? plan.intervalDays : '—';
+    sum.innerHTML = `<strong>${escapeHtml(name)}</strong><div>Water: ${water} every ${every} days</div><div>Pot: ${stepData.potSizeIn || ''} in</div>`;
+  }
+
   // Views
   const views = {
     showDashboard(){
@@ -74,25 +95,23 @@
     showEditor(plant){
       $('#dashboardView').classList.remove('active');
       $('#editorView').classList.add('active');
-      const isEdit = !!plant;
-      $('#plantId').value = plant?.id || '';
+      stepData.id = plant?.id || '';
+      stepData.carePlan = plant?.carePlan || null;
+      stepData.potSizeIn = plant?.potSizeIn || 6;
+      stepData.soilType = plant?.soilType || 'generic';
+      stepData.hasDrain = plant?.hasDrain !== false;
       $('#plantName').value = plant?.name || '';
-      $('#plantFamily').value = plant?.family || '';
-      $('#plantGenus').value = plant?.genus || '';
-      $('#plantSpecies').value = plant?.species || '';
-      $('#cultivar').value = plant?.cultivar || '';
-      const pin = (plant?.potDiameterIn != null) ? plant.potDiameterIn : (plant?.potDiameterCm ? (plant.potDiameterCm/2.54) : '');
-      $('#potDiameter').value = pin || '';
-      $('#baseInterval').value = plant?.baseIntervalDays || 7;
-      $('#lightLevel').value = plant?.lightLevel || 'medium';
-      $('#potSize').value = plant?.potSize || 'medium';
-      $('#soilType').value = plant?.soilType || 'generic';
-      $('#exposure').value = plant?.exposure || '';
-      $('#inout').value = plant?.inout || 'indoor';
-      $('#roomLabel').value = plant?.roomLabel || '';
-      $('#lastWatered').value = plant?.lastWatered || '';
-      $('#notes').value = plant?.notes || '';
-      try{ updateWaterRec(); }catch{}
+      $('#isOutdoor').checked = plant?.inout === 'outdoor';
+      $('#potSize').value = String(stepData.potSizeIn);
+      $('#soilType').value = stepData.soilType;
+      $('#hasDrain').checked = stepData.hasDrain;
+      if(stepData.carePlan){
+        const oz = (stepData.carePlan.waterMl*0.033814).toFixed(1);
+        $('#carePlanDetails').innerHTML = `Water ${stepData.carePlan.waterMl} ml (${oz} oz) every ${stepData.carePlan.intervalDays} days<br>Pot: ${stepData.potSizeIn} in`;
+      }else{
+        const cd = $('#carePlanDetails'); if(cd) cd.textContent = 'No plan';
+      }
+      showStep(1);
     },
     showPlantsPage(){
       $('#dashboardView').classList.remove('active');
@@ -146,12 +165,12 @@
     const dueTxt = humanDue(p.nextDue);
     const badge = dueClass(p.nextDue);
     const s = getSettings();
-    const modeled = Math.round((p.baseIntervalDays||7)
-      * intervalMultiplier(p.lightLevel, p.potSize)
-      * seasonalMultiplier(s, p.weatherOverride)
-      * microEnvironmentMultiplier(p)
-      * (1 + (Number(p.tuneIntervalPct||0)/100))
-    );
+      const modeled = Math.round((p.intervalDays || p.carePlan?.intervalDays || p.baseIntervalDays || 7)
+        * intervalMultiplier(p.potSize || potCategoryFromInches(p.potSizeIn))
+        * seasonalMultiplier(s, p.weatherOverride)
+        * microEnvironmentMultiplier(p)
+        * (1 + (Number(p.tuneIntervalPct||0)/100))
+      );
     const factor = seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneIntervalPct||0)/100));
     const wx = wxPill(p);
     const volPill = waterPill(p);
@@ -490,8 +509,8 @@
     const tasks = (p.tasks||[]).filter(t => t.type && t.everyDays).slice(0,2);
     const tasksHTML = tasks.map(t => `<span class="pill ${t.nextDue ? dueClass(t.nextDue) : ''}">${escapeHtml(labelForTask(t))}</span>`).join('');
     const s = getSettings();
-    const modeled = Math.round((p.baseIntervalDays||7)
-      * intervalMultiplier(p.lightLevel, p.potSize)
+    const modeled = Math.round((p.intervalDays || p.carePlan?.intervalDays || p.baseIntervalDays || 7)
+      * intervalMultiplier(p.potSize || potCategoryFromInches(p.potSizeIn))
       * seasonalMultiplier(s, p.weatherOverride)
       * microEnvironmentMultiplier(p)
       * (1 + (Number(p.tuneIntervalPct||0)/100))
@@ -580,189 +599,104 @@
     });
   }
 
-  $('#plantForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = $('#plantId').value || cryptoRandomId();
-    const plant = {
-      id,
-      name: $('#plantName').value.trim(),
-      species: $('#plantSpecies').value.trim(),
-      genus: $('#plantGenus').value.trim(),
-      family: $('#plantFamily').value.trim(),
-      cultivar: $('#cultivar').value.trim(),
-      baseIntervalDays: Number($('#baseInterval').value || 7),
-      potDiameterIn: Number($('#potDiameter').value || 0),
-      lightLevel: $('#lightLevel').value,
-      potSize: $('#potSize').value,
-      soilType: $('#soilType').value,
-      exposure: $('#exposure').value,
-      inout: $('#inout').value,
-      roomLabel: $('#roomLabel').value.trim(),
-      lastWatered: $('#lastWatered').value || todayISO(),
-      notes: $('#notes').value.trim(),
-      tasks: collectTasks(),
-    };
-    // Persist plant-level weather override if present
-    const tag = document.getElementById('plantWeatherTag');
-    if(tag && tag.dataset.temp && tag.dataset.rh){
-      plant.weatherOverride = { tempC: parseFloat(tag.dataset.temp), rh: parseFloat(tag.dataset.rh), fetchedAt: tag.dataset.time || new Date().toISOString() };
-    }else{
-      delete plant.weatherOverride;
-    }
-    plant.nextDue = nextDueFrom(plant);
-    await PlantDB.put(plant);
-    views.showDashboard();
-  });
+    // Editor navigation
+    $$('#editorView [data-next]').forEach(btn => btn.addEventListener('click', () => showStep(Math.min(5, currentStep+1))));
+    $$('#editorView [data-prev]').forEach(btn => btn.addEventListener('click', () => showStep(Math.max(1, currentStep-1))));
 
-  // Suggest taxonomy via optional OpenAI proxy, else GBIF fallback
-  $('#suggestTaxonomy').addEventListener('click', async () => {
-    const name = ($('#plantName').value || '').trim();
-    if(!name){ alert('Enter a plant name first'); return; }
-    try{
-      const suggestions = await getTaxoSuggestions(name);
-      renderTaxoSuggestions(suggestions);
-    }catch(err){ alert('Suggestion failed'); }
-  });
-
-  // Smart defaults based on name/genus/species
-  ;['plantName','plantGenus','plantSpecies'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.addEventListener('input', applySmartDefaults);
-  });
-  function applySmartDefaults(){
-    const name = document.getElementById('plantName').value.toLowerCase();
-    const genus = document.getElementById('plantGenus').value.toLowerCase();
-    const species = document.getElementById('plantSpecies').value.toLowerCase();
-    const hint = `${genus} ${species} ${name}`;
-    const setIfEmpty = (id, val) => { const el = document.getElementById(id); if(el && (!el.value || el.value===el.getAttribute('placeholder'))) el.value = val; };
-    // Heuristics
-    if(/(aloe|echeveria|haworth|crassula|sedum|opuntia|cactus|succulent|sansevieria|trifasciata|snake)/.test(hint)){
-      setIfEmpty('soilType','cactus'); setIfEmpty('lightLevel','high'); setIfEmpty('baseInterval', 12);
-    }else if(/(monstera|philodendron|anthurium|epipremnum|pothos|syngonium|aroid)/.test(hint)){
-      setIfEmpty('soilType','aroid'); setIfEmpty('lightLevel','medium'); setIfEmpty('baseInterval', 7);
-    }else if(/(fern|nephrolepis|pteris|blechnum)/.test(hint)){
-      setIfEmpty('soilType','generic'); setIfEmpty('lightLevel','low'); setIfEmpty('baseInterval', 4);
-    }else if(/(ficus|lyrata|rubber)/.test(hint)){
-      setIfEmpty('soilType','aroid'); setIfEmpty('lightLevel','high'); setIfEmpty('baseInterval', 6);
-    }else if(/(zamioculcas|zz\s*plant)/.test(hint)){
-      setIfEmpty('soilType','generic'); setIfEmpty('lightLevel','low'); setIfEmpty('baseInterval', 12);
-    }
-    // Reasonable pot default
-    setIfEmpty('potDiameter', 6);
-  }
-
-  // Update GBIF/Wikipedia links when taxon fields change
-  // Removed external GBIF/Wikipedia buttons for a cleaner flow.
-
-  // Cultivar suggestions via OpenAI proxy (optional)
-  const cultBtn = document.getElementById('suggestCultivar');
-  if(cultBtn){
-    cultBtn.addEventListener('click', async () => {
-      const genus = document.getElementById('plantGenus').value.trim();
-      const species = document.getElementById('plantSpecies').value.trim();
-      const name = document.getElementById('plantName').value.trim();
+    // Taxonomy lookup
+    document.getElementById('lookupTaxonomy').addEventListener('click', async () => {
+      const name = ($('#plantName').value || '').trim();
+      if(!name){ alert('Enter a plant name first'); return; }
       try{
-        const list = await getCultivarSuggestions({ genus, species, name });
-        renderCultivarSuggestions(list);
-      }catch{ alert('Cultivar suggestion failed'); }
+        const suggestions = await getTaxoSuggestions(name);
+        renderTaxoSuggestions(suggestions);
+      }catch{ alert('Suggestion failed'); }
     });
-  }
-  async function getCultivarSuggestions({ genus, species, name }){
-    if(!window.OPENAI_PROXY_URL) return [];
-    const q = [genus, species].filter(Boolean).join(' ');
-    const prompt = `Suggest 3-6 widely known horticultural cultivars for ${q || name}. Return a JSON array of strings with cultivar names only.`;
-    try{
-      const r = await fetch(window.OPENAI_PROXY_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ q: prompt }) });
-      if(!r.ok) return [];
-      const j = await r.json();
-      if(Array.isArray(j)) return j.filter(x => typeof x === 'string');
-      if(j && Array.isArray(j.cultivars)) return j.cultivars;
-      return [];
-    }catch{ return []; }
-  }
-  function renderCultivarSuggestions(list){
-    const host = document.getElementById('cultivarSuggestions');
-    if(!host) return; host.innerHTML = '';
-    if(!list || !list.length){ host.textContent = 'No cultivar suggestions.'; return; }
-    list.forEach(name => {
-      const chip = document.createElement('span'); chip.className = 'sugg'; chip.textContent = name; chip.title = 'Click to apply';
-      chip.onclick = () => { document.getElementById('cultivar').value = name; };
-      host.appendChild(chip);
-    });
-  }
 
-  // AI Care Plan (one-shot)
-  const planBtn = document.getElementById('generatePlanBtn');
-  if(planBtn){
-    planBtn.addEventListener('click', async () => {
-      const name = document.getElementById('plantName').value.trim();
-      const inout = document.getElementById('inout').value;
-      const exposure = document.getElementById('exposure').value;
-      const potIn = parseFloat(document.getElementById('potDiameter').value || '0');
-      if(!name){ alert('Enter a plant name or common name first'); return; }
+    // Location selection
+    $$('#locationChips [data-loc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        stepData.location = btn.dataset.loc;
+        $$('#locationChips [data-loc]').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+    document.getElementById('isOutdoor').addEventListener('change', e => {
+      stepData.inout = e.target.checked ? 'outdoor' : 'indoor';
+    });
+
+    // Pot & soil inputs
+    document.getElementById('potSize').addEventListener('change', e => { stepData.potSizeIn = parseInt(e.target.value,10); });
+    document.getElementById('soilType').addEventListener('change', e => { stepData.soilType = e.target.value; });
+    document.getElementById('hasDrain').addEventListener('change', e => { stepData.hasDrain = e.target.checked; });
+
+    // Weather fetch
+    document.getElementById('fetchWeather').addEventListener('click', async () => {
+      try{
+        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej));
+        const lat = pos.coords.latitude; const lon = pos.coords.longitude;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m`;
+        const r = await fetch(url); const j = await r.json();
+        let t = j?.current?.temperature_2m; let h = j?.current?.relative_humidity_2m;
+        if(!Number.isFinite(t) || !Number.isFinite(h)) throw new Error('weather');
+        if(!stepData.inout || stepData.inout === 'indoor'){ t -= 2; h = Math.min(100, h + 10); }
+        stepData.weatherOverride = { tempC: t, rh: h, fetchedAt: new Date().toISOString() };
+        const tag = document.getElementById('weatherTag');
+        tag.textContent = `Weather: ${Math.round(t)}°C / ${Math.round(h)}%`;
+      }catch{ alert('Location permission or network failed'); }
+    });
+    document.getElementById('clearWeather').addEventListener('click', () => {
+      stepData.weatherOverride = null;
+      const tag = document.getElementById('weatherTag'); if(tag) tag.textContent = '';
+    });
+
+    // Care plan generation
+    document.getElementById('genCarePlan').addEventListener('click', async () => {
+      const name = $('#plantName').value.trim();
+      if(!name){ alert('Enter a plant name first'); return; }
       if(!window.OPENAI_PLAN_URL){ alert('AI plan URL not configured.'); return; }
-      planBtn.disabled = true; planBtn.textContent = 'Generating…';
+      const potIn = stepData.potSizeIn || 6;
+      const btn = document.getElementById('genCarePlan');
+      btn.disabled = true; btn.textContent = 'Generating…';
       try{
-        const r = await fetch(window.OPENAI_PLAN_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name, inout, exposure, potIn }) });
+        const r = await fetch(window.OPENAI_PLAN_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name, potIn }) });
         if(!r.ok) throw new Error('plan');
         const plan = await r.json();
-        applyCarePlan(plan);
-      }catch(err){ alert('Failed to generate care plan'); }
-      finally{ planBtn.disabled = false; planBtn.textContent = 'AI Care Plan'; }
+        stepData.family = plan.family || stepData.family;
+        stepData.genus = plan.genus || stepData.genus;
+        stepData.species = plan.species || stepData.species;
+        stepData.carePlan = { intervalDays: plan.baseIntervalDays || plan.intervalDays || 7, waterMl: plan.waterMl || 250 };
+        const oz = (stepData.carePlan.waterMl*0.033814).toFixed(1);
+        document.getElementById('carePlanDetails').innerHTML = `Water ${stepData.carePlan.waterMl} ml (${oz} oz) every ${stepData.carePlan.intervalDays} days<br>Pot: ${stepData.potSizeIn} in`;
+      }catch{ alert('Failed to generate care plan'); }
+      finally{ btn.disabled = false; btn.textContent = 'Generate Plan'; }
     });
-  }
-  function applyCarePlan(p){
-    if(p.family) document.getElementById('plantFamily').value = p.family;
-    if(p.genus) document.getElementById('plantGenus').value = p.genus;
-    if(p.species) document.getElementById('plantSpecies').value = p.species;
-    if(p.cultivar) document.getElementById('cultivar').value = p.cultivar;
-    if(p.potDiameterIn) document.getElementById('potDiameter').value = Number(p.potDiameterIn) || '';
-    if(p.lightLevel) document.getElementById('lightLevel').value = p.lightLevel;
-    if(p.soilType) document.getElementById('soilType').value = p.soilType;
-    if(Number.isFinite(p.baseIntervalDays)) document.getElementById('baseInterval').value = p.baseIntervalDays;
-    if(p.tasks && Array.isArray(p.tasks)){
-      const slots = ['1','2','3'];
-      for(let i=0;i<slots.length;i++){
-        const t = p.tasks[i]; if(!t) break;
-        document.getElementById(`task${slots[i]}Type`).value = t.type || '';
-        document.getElementById(`task${slots[i]}Every`).value = t.everyDays || '';
-      }
-    }
-    // Put care summary into notes if provided
-    if(p.careSummary){
-      const prev = document.getElementById('notes').value.trim();
-      document.getElementById('notes').value = p.careSummary + (prev ? ('\n\n' + prev) : '');
-    }
-    updateWaterRec();
-  }
-  // Per-plant weather override
-  document.getElementById('usePlantWeather').addEventListener('click', async () => {
-    try{
-      let lat = parseFloat(document.getElementById('plantLat').value || '');
-      let lon = parseFloat(document.getElementById('plantLon').value || '');
-      if(!Number.isFinite(lat) || !Number.isFinite(lon)){
-        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej));
-        lat = pos.coords.latitude; lon = pos.coords.longitude;
-      }
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m`;
-      const r = await fetch(url);
-      const j = await r.json();
-      let t = j?.current?.temperature_2m; let h = j?.current?.relative_humidity_2m;
-      if(!Number.isFinite(t) || !Number.isFinite(h)) throw new Error('weather');
-      // If indoor, shift toward typical indoor conditions
-      const inout = document.getElementById('inout').value || 'indoor';
-      if(inout === 'indoor'){ t = t - 2; h = Math.min(100, h + 10); }
-      const tag = document.getElementById('plantWeatherTag');
-      tag.textContent = `Plant weather: ${Math.round(t)}°C / ${Math.round(h)}%`;
-      tag.dataset.temp = String(t); tag.dataset.rh = String(h);
-      tag.dataset.time = new Date().toISOString();
-      updateWaterRec();
-    }catch(err){ alert('Location permission or network failed'); }
-  });
-  document.getElementById('clearPlantWeather').addEventListener('click', () => {
-    const tag = document.getElementById('plantWeatherTag');
-    tag.textContent = ''; delete tag.dataset.temp; delete tag.dataset.rh; delete tag.dataset.time;
-    updateWaterRec();
-  });
+
+    // Final add action
+    document.getElementById('addSpecimen').addEventListener('click', async () => {
+      const id = stepData.id || cryptoRandomId();
+      const name = $('#plantName').value.trim();
+      const plant = {
+        id,
+        name,
+        family: stepData.family || '',
+        genus: stepData.genus || '',
+        species: stepData.species || '',
+        potSizeIn: stepData.potSizeIn,
+        potSize: potCategoryFromInches(stepData.potSizeIn),
+        soilType: stepData.soilType,
+        hasDrain: stepData.hasDrain,
+        inout: stepData.inout || ($('#isOutdoor').checked ? 'outdoor' : 'indoor'),
+        location: stepData.location || '',
+        carePlan: stepData.carePlan || null,
+        lastWatered: todayISO(),
+      };
+      if(stepData.weatherOverride) plant.weatherOverride = stepData.weatherOverride;
+      plant.intervalDays = stepData.carePlan?.intervalDays || plant.baseIntervalDays || 7;
+      plant.nextDue = nextDueFrom(plant);
+      await PlantDB.put(plant);
+      views.showDashboard();
+    });
 
   async function getTaxoSuggestions(name){
     const out = [];
@@ -789,25 +723,25 @@
     return dedup.slice(0,8);
   }
 
-  function renderTaxoSuggestions(list){
-    const host = document.getElementById('taxoSuggestions');
-    if(!host) return;
-    host.innerHTML = '';
-    if(!list || !list.length){ host.textContent = 'No suggestions.'; return; }
-    for(const s of list){
-      const chip = document.createElement('span');
-      chip.className = 'sugg';
-      const label = [s.family?`[${s.family}]`:null, [s.genus,s.species].filter(Boolean).join(' ')||s.name].filter(Boolean).join(' ');
-      chip.textContent = label;
-      chip.title = 'Click to apply';
-      chip.onclick = () => {
-        if(s.family) document.getElementById('plantFamily').value = s.family;
-        if(s.genus) document.getElementById('plantGenus').value = s.genus;
-        if(s.species) document.getElementById('plantSpecies').value = s.species;
-      };
-      host.appendChild(chip);
+    function renderTaxoSuggestions(list){
+      const host = document.getElementById('taxoResults');
+      if(!host) return;
+      host.innerHTML = '';
+      if(!list || !list.length){ host.textContent = 'No suggestions.'; return; }
+      for(const s of list){
+        const chip = document.createElement('span');
+        chip.className = 'sugg';
+        const label = [s.family?`[${s.family}]`:null, [s.genus,s.species].filter(Boolean).join(' ')||s.name].filter(Boolean).join(' ');
+        chip.textContent = label;
+        chip.title = 'Click to apply';
+        chip.onclick = () => {
+          stepData.family = s.family || '';
+          stepData.genus = s.genus || '';
+          stepData.species = s.species || '';
+        };
+        host.appendChild(chip);
+      }
     }
-  }
 
   // Import / Export
   $('#exportBtn').addEventListener('click', async () => {
@@ -888,7 +822,7 @@
     }
     // Stats
     const s = getSettings();
-    const modeled = Math.round((plant.baseIntervalDays||7) * intervalMultiplier(plant.lightLevel, plant.potSize) * seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100)));
+      const modeled = Math.round((plant.intervalDays || plant.carePlan?.intervalDays || plant.baseIntervalDays || 7) * intervalMultiplier(plant.potSize || potCategoryFromInches(plant.potSizeIn)) * seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100)));
     const factor = seasonalMultiplier(s, plant.weatherOverride) * microEnvironmentMultiplier(plant) * (1 + (Number(plant.tuneIntervalPct||0)/100));
     const water = waterPill(plant);
     const dueTxt = humanDue(nextDueFrom(plant));
@@ -941,13 +875,14 @@
     const pad = 40;
     const W = canvas.width - pad*2;
     const H = canvas.height - pad*2;
-    const maxY = Math.max(...intervals, plant.baseIntervalDays || 7) * 1.2;
+      const baseInt = plant.intervalDays || plant.carePlan?.intervalDays || plant.baseIntervalDays || 7;
+      const maxY = Math.max(...intervals, baseInt) * 1.2;
     // Axes
     ctx.strokeStyle = '#244437'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, pad+H); ctx.lineTo(pad+W, pad+H); ctx.stroke();
     // Baseline (base interval and current modeled interval)
-    const base = plant.baseIntervalDays || 7;
-    const modeled = Math.round((plant.baseIntervalDays||7) * intervalMultiplier(plant.lightLevel, plant.potSize));
+      const base = baseInt;
+      const modeled = Math.round(baseInt * intervalMultiplier(plant.potSize || potCategoryFromInches(plant.potSizeIn)));
     ctx.strokeStyle = '#62d2b1'; ctx.setLineDash([4,4]);
     let yBase = pad + H - (base/maxY)*H; ctx.beginPath(); ctx.moveTo(pad, yBase); ctx.lineTo(pad+W, yBase); ctx.stroke();
     ctx.setLineDash([]);
@@ -1054,16 +989,7 @@
     });
   }
 
-  function collectTasks(){
-    const slots = [
-      { t: $('#task1Type').value, e: Number($('#task1Every').value||0) },
-      { t: $('#task2Type').value, e: Number($('#task2Every').value||0) },
-      { t: $('#task3Type').value, e: Number($('#task3Every').value||0) },
-    ];
-    return slots.filter(s => s.t && s.e>0).map(s => ({ type:s.t, everyDays:s.e }));
-  }
-
-  function taxonLine(p){
+    function taxonLine(p){
     const parts = [];
     if(p.family) parts.push(p.family);
     if(p.genus) parts.push(p.genus + (p.species ? ` ${p.species}` : ''));
@@ -1131,7 +1057,7 @@
   }
 
   function waterPill(p){
-    const din = (p.potDiameterIn != null) ? p.potDiameterIn : (p.potDiameterCm ? (p.potDiameterCm/2.54) : 0);
+    const din = p.potSizeIn || (p.potDiameterIn != null ? p.potDiameterIn : (p.potDiameterCm ? (p.potDiameterCm/2.54) : 0));
     if(!din || din<=0) return '';
     const s = getSettings();
     const vol = estimateWaterMlFromInches(din, seasonalMultiplier(s, p.weatherOverride) * microEnvironmentMultiplier(p) * (1 + (Number(p.tuneVolumePct||0)/100)));
@@ -1198,7 +1124,7 @@
     if(p.cultivar) lines.push(`Cultivar: ${p.cultivar}`);
     lines.push(`Light: ${p.lightLevel || 'medium'}`);
     lines.push(`Pot: ${p.potSize || 'medium'}`);
-    lines.push(`Base interval: ${p.baseIntervalDays||7}d`);
+      lines.push(`Base interval: ${p.intervalDays || p.carePlan?.intervalDays || p.baseIntervalDays || 7}d`);
     const tasks = (p.tasks||[]).filter(t=>t.type).map(t => `• ${t.type} every ${t.everyDays}d${t.nextDue ? ` (${humanDue(t.nextDue)})` : ''}`);
     if(tasks.length) lines.push('Tasks:\n' + tasks.join('\n'));
     return lines.join('\n');
@@ -1309,44 +1235,7 @@
     }catch(err){ alert('Location permission or network failed'); }
   });
 
-  // Watering volume recommendation in editor
-  const formInputs = ['plantName','plantGenus','plantSpecies','baseInterval','lightLevel','potSize','potDiameter','tuneIntervalPct','tuneVolumePct'];
-  formInputs.forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.addEventListener('input', updateWaterRec);
-  });
-  function updateWaterRec(){
-    const base = Number($('#baseInterval').value||7);
-    const light = $('#lightLevel').value; const pot = $('#potSize').value;
-    const din = Number($('#potDiameter').value||0);
-    const s = getSettings();
-    const plant = {
-      soilType: document.getElementById('soilType')?.value,
-      inout: document.getElementById('inout')?.value,
-      exposure: document.getElementById('exposure')?.value,
-      tuneIntervalPct: Number(document.getElementById('tuneIntervalPct')?.value || 0),
-      tuneVolumePct: Number(document.getElementById('tuneVolumePct')?.value || 0),
-    };
-    const micro = microEnvironmentMultiplier(plant);
-    // Use plant editor override if present in tag
-    const tag = document.getElementById('plantWeatherTag');
-    const override = (tag && tag.dataset.temp && tag.dataset.rh) ? { tempC: parseFloat(tag.dataset.temp), rh: parseFloat(tag.dataset.rh) } : undefined;
-    const seasonal = seasonalMultiplier(s, override);
-    const mult = intervalMultiplier(light, pot) * seasonal * micro * (1 + plant.tuneIntervalPct/100);
-    const modeled = Math.max(1, Math.round(base * mult));
-    const vol = estimateWaterMlFromInches(din, seasonal * micro * (1 + plant.tuneVolumePct/100));
-    const rec = document.getElementById('waterRec');
-    if(rec){
-      if(vol){
-        const oz = { min: (vol.min/29.5735), max: (vol.max/29.5735) };
-        const fmt = (n) => (Math.round(n*10)/10).toFixed(1);
-        rec.textContent = `${vol.min}-${vol.max} ml (${fmt(oz.min)}–${fmt(oz.max)} oz) • every ~${modeled} days`;
-      }else{
-        rec.textContent = `every ~${modeled} days`;
-      }
-    }
-  }
-  function estimateWaterMlFromInches(diameterIn, factor){
+    function estimateWaterMlFromInches(diameterIn, factor){
     if(!diameterIn || diameterIn<=0) return null;
     const d = diameterIn * 0.0254; // m
     const h = d*0.9; // m, approx
@@ -1396,21 +1285,21 @@
 
   function makeDemoPlants(){
     const today = todayISO();
-    const mk = (id, name, tax, light, potSize, potIn, soil, inout, exposure, baseDays) => ({
+    const mk = (id, name, tax, light, potIn, soil, inout, exposure, interval) => ({
       id, name,
       family: tax.family, genus: tax.genus, species: tax.species, cultivar: tax.cultivar||'',
-      lightLevel: light, potSize, potDiameterIn: potIn,
+      lightLevel: light, potSize: potCategoryFromInches(potIn), potSizeIn: potIn,
       soilType: soil, inout, exposure, roomLabel: '',
-      baseIntervalDays: baseDays, tuneIntervalPct: 0, tuneVolumePct: 0,
+      intervalDays: interval, tuneIntervalPct: 0, tuneVolumePct: 0,
       lastWatered: today, notes: '', tasks: [ {type:'fertilize', everyDays:30}, {type:'inspect', everyDays:14} ],
       observations: [], history: [{type:'water', at: today}],
     });
     return [
-      mk(cryptoRandomId(), 'Monstera', {family:'Araceae',genus:'Monstera',species:'deliciosa'}, 'medium', 'large', 10, 'aroid', 'indoor', 'E', 7),
-      mk(cryptoRandomId(), 'ZZ Plant', {family:'Araceae',genus:'Zamioculcas',species:'zamiifolia'}, 'low', 'medium', 8, 'generic', 'indoor', 'N', 12),
-      mk(cryptoRandomId(), 'Snake Plant', {family:'Asparagaceae',genus:'Dracaena',species:'trifasciata'}, 'low', 'medium', 6, 'cactus', 'indoor', 'W', 14),
-      mk(cryptoRandomId(), 'Fiddle-Leaf Fig', {family:'Moraceae',genus:'Ficus',species:'lyrata'}, 'high', 'large', 12, 'aroid', 'indoor', 'S', 6),
-      mk(cryptoRandomId(), 'Aloe', {family:'Asphodelaceae',genus:'Aloe',species:'vera'}, 'high', 'small', 6, 'cactus', 'outdoor', 'S', 10),
+      mk(cryptoRandomId(), 'Monstera', {family:'Araceae',genus:'Monstera',species:'deliciosa'}, 'medium', 10, 'aroid', 'indoor', 'E', 7),
+      mk(cryptoRandomId(), 'ZZ Plant', {family:'Araceae',genus:'Zamioculcas',species:'zamiifolia'}, 'low', 8, 'generic', 'indoor', 'N', 12),
+      mk(cryptoRandomId(), 'Snake Plant', {family:'Asparagaceae',genus:'Dracaena',species:'trifasciata'}, 'low', 6, 'cactus', 'indoor', 'W', 14),
+      mk(cryptoRandomId(), 'Fiddle-Leaf Fig', {family:'Moraceae',genus:'Ficus',species:'lyrata'}, 'high', 12, 'aroid', 'indoor', 'S', 6),
+      mk(cryptoRandomId(), 'Aloe', {family:'Asphodelaceae',genus:'Aloe',species:'vera'}, 'high', 6, 'cactus', 'outdoor', 'S', 10),
     ];
   }
 
