@@ -68,7 +68,21 @@
   const stepData = {};
   let taxoSuggestions = [];
   let activeTaxo = -1;
+  let photoObjectURL = null;
+
+  function clearPhotoPreview(){
+    const preview = document.getElementById('photoPreview');
+    if(preview) preview.innerHTML = '';
+    const input = document.getElementById('plantPhoto');
+    if(input) input.value = '';
+    if(photoObjectURL){
+      URL.revokeObjectURL(photoObjectURL);
+      photoObjectURL = null;
+    }
+  }
+
   function showStep(n){
+    if(currentStep === 1 && n !== 1) clearPhotoPreview();
     currentStep = n;
     const steps = $$('#editorSteps .step');
     steps.forEach((s,i) => s.classList.toggle('hidden', i+1 !== n));
@@ -97,6 +111,7 @@
   // Views
   const views = {
     showDashboard(){
+      clearPhotoPreview();
       $('#editorView').classList.remove('active');
       $('#dashboardView').classList.add('active');
       $('#plantsPage').classList.remove('active');
@@ -107,6 +122,7 @@
     showEditor(plant){
       $('#dashboardView').classList.remove('active');
       $('#editorView').classList.add('active');
+      clearPhotoPreview();
       stepData.id = plant?.id || '';
       stepData.carePlan = plant?.carePlan || null;
       stepData.potSizeIn = plant?.potSizeIn || 6;
@@ -599,7 +615,7 @@
 
   // Form handling
   $('#addPlantBtn').addEventListener('click', () => views.showEditor(null));
-  $('#cancelEdit').addEventListener('click', () => views.showDashboard());
+  $('#cancelEdit').addEventListener('click', () => { clearPhotoPreview(); views.showDashboard(); });
   // Seed demo data
   const seedBtn = document.getElementById('seedBtn');
   if(seedBtn){
@@ -646,6 +662,27 @@
       }else if(e.key === 'Enter' && activeTaxo >= 0){
         e.preventDefault();
         items[activeTaxo].click();
+      }
+    });
+
+    // Photo preview
+    const photoInput = document.getElementById('plantPhoto');
+    photoInput.addEventListener('change', e => {
+      if(photoObjectURL){
+        URL.revokeObjectURL(photoObjectURL);
+        photoObjectURL = null;
+      }
+      const file = e.target.files[0];
+      const prev = document.getElementById('photoPreview');
+      if(!file){
+        if(prev) prev.innerHTML = '';
+        return;
+      }
+      photoObjectURL = URL.createObjectURL(file);
+      if(prev){
+        prev.innerHTML = `<img src="${photoObjectURL}" alt="Plant photo" class="mb-2 max-w-full rounded border"/><button type="button" class="btn" id="removePhoto">Remove</button>`;
+        const btn = document.getElementById('removePhoto');
+        if(btn) btn.addEventListener('click', clearPhotoPreview);
       }
     });
 
