@@ -121,3 +121,31 @@ Usage examples:
 
 Production note:
 - For full tree-shaking, you can switch to a build step later (Tailwind CLI/PostCSS). For now, the CDN keeps things simple and works with the service worker cache.
+## Deploy on Vercel (Build Output API)
+
+This repo serves static files from the repo root. We use Tailwind CLI and Vercel’s Build Output API to deploy cleanly.
+
+Checklist:
+
+- GitHub: push this repo as-is (index.html at repo root)
+- Vercel → New Project → Import repo
+- Project Settings → Build & Output:
+  - Framework Preset: Other
+  - Root Directory: /
+  - Install Command: npm install
+  - Build Command: npm run build
+  - Output Directory: leave blank (root)
+- Environment → Add `OPENAI_API_KEY`
+- Deploy
+
+What the build does:
+
+- Runs Tailwind CLI to generate `tailwind.css`
+- Emits `.vercel/output/static` with: `index.html`, `health.html`, `styles.css`, `tailwind.css`, `app.js`, `db.js`, `sw.js`, `manifest.webmanifest`, `config.js`
+- Emits functions at `.vercel/output/functions/api/{suggest,plan}.func`
+
+Verify after deploy:
+
+- Open `/health.html` → should show checks for Tailwind and both API endpoints
+- Open the homepage → should render Tasks and Plants; try Add Demo
+- If you still see “public” output errors, ensure Framework=Other and Output Directory is blank; also make sure `.vercel/output` is present in the Build log

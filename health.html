@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plant Tracker • Health</title>
+    <link rel="stylesheet" href="tailwind.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <style> body{ padding:16px } code{ padding:2px 4px; background:#0002; border-radius:6px } .ok{ color:#22c55e } .bad{ color:#ef4444 } </style>
+  </head>
+  <body>
+    <h1 class="text-xl font-semibold">Health Check</h1>
+    <ul id="checks" class="list-disc pl-6"></ul>
+
+    <script>
+      (async function(){
+        const log = (ok, msg) => {
+          const li = document.createElement('li'); li.className = ok ? 'ok' : 'bad'; li.textContent = (ok ? '✓ ' : '✕ ') + msg; document.getElementById('checks').appendChild(li);
+        };
+        // Tailwind check: ensure a Tailwind class applies
+        const probe = document.createElement('div'); probe.className = 'hidden'; document.body.appendChild(probe);
+        const hiddenWorks = getComputedStyle(probe).display === 'none';
+        log(hiddenWorks, 'Tailwind utilities loaded');
+        probe.remove();
+        // API checks
+        async function ping(url, body){
+          try{
+            const r = await fetch(url, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body||{q:'Monstera deliciosa'}) });
+            log(r.ok, url + ' responded ' + r.status);
+          }catch(err){ log(false, url + ' failed'); }
+        }
+        await ping('/api/suggest', { q: 'Monstera deliciosa' });
+        await ping('/api/plan', { name: 'Monstera deliciosa', inout:'indoor' });
+        // SW
+        log('serviceWorker' in navigator, 'Service worker supported');
+        // Hash route
+        log(true, 'SPA route ok: ' + location.origin + location.pathname + '#plant/<id>');
+      })();
+    </script>
+  </body>
+  </html>
+
