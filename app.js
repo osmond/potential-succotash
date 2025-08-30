@@ -126,12 +126,22 @@
       stepData.id = plant?.id || '';
       stepData.carePlan = plant?.carePlan || null;
       stepData.potSizeIn = plant?.potSizeIn || 6;
+      stepData.material = plant?.material || 'plastic';
       stepData.soilType = plant?.soilType || 'generic';
       stepData.hasDrain = plant?.hasDrain !== false;
       $('#plantName').value = plant?.name || '';
       $('#isOutdoor').checked = plant?.inout === 'outdoor';
       $('#potSize').value = String(stepData.potSizeIn);
-      $('#soilType').value = stepData.soilType;
+      $$('#materialChips .chip').forEach(b => {
+        const sel = b.dataset.material === stepData.material;
+        b.classList.toggle('selected', sel);
+        b.setAttribute('aria-checked', sel ? 'true' : 'false');
+      });
+      $$('#soilChips .chip').forEach(b => {
+        const sel = b.dataset.soil === stepData.soilType;
+        b.classList.toggle('selected', sel);
+        b.setAttribute('aria-checked', sel ? 'true' : 'false');
+      });
       $('#hasDrain').checked = stepData.hasDrain;
       if(stepData.carePlan){
         const oz = (stepData.carePlan.waterMl*0.033814).toFixed(1);
@@ -755,9 +765,24 @@
       const tag = document.getElementById('weatherTag'); if(tag) tag.textContent = '';
     });
 
-    // Pot & soil inputs
-    document.getElementById('potSize').addEventListener('change', e => { stepData.potSizeIn = parseInt(e.target.value,10); });
-    document.getElementById('soilType').addEventListener('change', e => { stepData.soilType = e.target.value; });
+    // Pot, material, and soil inputs
+    document.getElementById('potSize').addEventListener('change', e => { stepData.potSizeIn = parseFloat(e.target.value); });
+    $$('#materialChips .chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        stepData.material = btn.dataset.material;
+        $$('#materialChips .chip').forEach(b => { b.classList.remove('selected'); b.setAttribute('aria-checked','false'); });
+        btn.classList.add('selected');
+        btn.setAttribute('aria-checked','true');
+      });
+    });
+    $$('#soilChips .chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        stepData.soilType = btn.dataset.soil;
+        $$('#soilChips .chip').forEach(b => { b.classList.remove('selected'); b.setAttribute('aria-checked','false'); });
+        btn.classList.add('selected');
+        btn.setAttribute('aria-checked','true');
+      });
+    });
     document.getElementById('hasDrain').addEventListener('change', e => { stepData.hasDrain = e.target.checked; });
 
     // Care plan generation
@@ -794,6 +819,7 @@
         species: stepData.species || '',
         potSizeIn: stepData.potSizeIn,
         potSize: potCategoryFromInches(stepData.potSizeIn),
+        material: stepData.material,
         soilType: stepData.soilType,
         hasDrain: stepData.hasDrain,
         inout: stepData.inout || ($('#isOutdoor').checked ? 'outdoor' : 'indoor'),

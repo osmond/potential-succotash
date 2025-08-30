@@ -203,17 +203,17 @@
     <div class="step hidden" data-step="3" id="stepPot">
       <h2 class="text-xl mb-2">Pot & Soil</h2>
       <div class="grid-2 gap-2 mb-4">
-        <select id="potSize" class="px-3 py-2 rounded-xl border">
-          <option value="4">4"</option>
-          <option value="6" selected>6"</option>
-          <option value="8">8"</option>
-          <option value="10">10"</option>
-        </select>
-        <select id="soilType" class="px-3 py-2 rounded-xl border">
-          <option value="generic" selected>Generic potting mix</option>
-          <option value="aroid">Aroid/tropical mix</option>
-          <option value="cactus">Cactus/succulent mix</option>
-        </select>
+        <input id="potSize" type="number" step="0.5" min="0" class="px-3 py-2 rounded-xl border" aria-label="Pot size (inches)" />
+        <div id="materialChips" class="flex gap-2" role="radiogroup" aria-label="Pot material">
+          <button type="button" class="chip" role="radio" aria-checked="false" data-material="plastic" aria-label="Plastic pot"><span aria-hidden="true">🪣</span></button>
+          <button type="button" class="chip" role="radio" aria-checked="false" data-material="terracotta" aria-label="Terracotta pot"><span aria-hidden="true">🏺</span></button>
+          <button type="button" class="chip" role="radio" aria-checked="false" data-material="ceramic" aria-label="Ceramic pot"><span aria-hidden="true">🍶</span></button>
+        </div>
+      </div>
+      <div id="soilChips" class="flex gap-2 mb-4" role="radiogroup" aria-label="Soil type">
+        <button type="button" class="chip" role="radio" aria-checked="false" data-soil="generic" aria-label="Generic potting mix"><span aria-hidden="true">🌱</span></button>
+        <button type="button" class="chip" role="radio" aria-checked="false" data-soil="aroid" aria-label="Aroid or tropical mix"><span aria-hidden="true">🪴</span></button>
+        <button type="button" class="chip" role="radio" aria-checked="false" data-soil="cactus" aria-label="Cactus or succulent mix"><span aria-hidden="true">🌵</span></button>
       </div>
       <label class="flex items-center gap-2 mb-4"><input type="checkbox" id="hasDrain" checked />Drainage holes</label>
       <div class="actions gap-2">
