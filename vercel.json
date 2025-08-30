@@ -1,21 +1,3 @@
 {
-  "version": 2,
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "buildCommand": "npm run build",
-  "builds": [
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "styles.css", "use": "@vercel/static" },
-    { "src": "tailwind.css", "use": "@vercel/static" },
-    { "src": "app.js", "use": "@vercel/static" },
-    { "src": "db.js", "use": "@vercel/static" },
-    { "src": "sw.js", "use": "@vercel/static" },
-    { "src": "manifest.webmanifest", "use": "@vercel/static" },
-    { "src": "api/**/*.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/sw.js", "headers": { "Cache-Control": "public,max-age=0,must-revalidate" } },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  "version": 2
 }
