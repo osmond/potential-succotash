@@ -210,13 +210,13 @@
       <article class="rounded-xl border p-3 bg-[color:var(--panel)] border-[color:var(--border)] flex flex-col gap-2">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <div class="font-semibold">${icon} ${escapeHtml(it.title)}</div>
+            <div class="font-semibold"><span title="${escapeHtml(capitalize(it.type))}">${icon}</span> ${escapeHtml(it.title)}</div>
             <div class="species text-sm text-[color:var(--muted)]">${escapeHtml(taxonLine(p))}</div>
           </div>
           <div class="pill ${badge}">${escapeHtml(rel)}</div>
         </div>
         <div class="flex flex-wrap gap-2 items-center">
-          ${it.type==='water' ? vol : `<span class="pill">every ${it.task.everyDays}d</span>`}
+          ${it.type==='water' ? vol : `<span class="pill" title="Task cadence">every ${it.task.everyDays}d</span>`}
         </div>
         <div class="actions-row">
           <button class="btn small" data-action="done">Done</button>
@@ -908,10 +908,11 @@
     return (parts || '—') + tuneStr;
   }
   function envChip(p){
-    const soil = p.soilType === 'cactus' ? 'cactus' : (p.soilType === 'aroid' ? 'aroid' : 'soil');
-    const where = p.inout === 'outdoor' ? 'out' : 'in';
+    const soilIcon = p.soilType === 'cactus' ? '🌵' : (p.soilType === 'aroid' ? '🪴' : '🪴');
+    const whereIcon = p.inout === 'outdoor' ? '🌤' : '🏠';
     const exp = p.exposure || '';
-    return `<span class="pill" title="Environment">${soil} • ${where}${exp?(' • '+exp):''}</span>`;
+    const title = `Soil: ${p.soilType||'generic'}; ${p.inout||'indoor'}${exp?(' • '+exp):''}`;
+    return `<span class="pill" title="${escapeHtml(title)}">${soilIcon} ${whereIcon}${exp?(' '+exp):''}</span>`;
   }
 
   // Weather pill in Details header

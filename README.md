@@ -138,6 +138,12 @@ Checklist:
 - Environment → Add `OPENAI_API_KEY`
 - Deploy
 
+Local dev helper
+
+- Install deps: `npm install`
+- Start local static server and open health page: `npm run dev`
+- Or build once: `npm run build` and open `health.html` in the browser
+
 What the build does:
 
 - Runs Tailwind CLI to generate `tailwind.css`
