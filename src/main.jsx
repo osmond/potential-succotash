@@ -1,15 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
-import { PlantDetail } from './components/PlantDetail.tsx';
+import RoomsView from './components/RoomsView.jsx';
 
-// Expose React and the PlantDetail component for non-React scripts
-window.React = React;
-window.ReactDOM = ReactDOM;
-window.PlantDetail = PlantDetail;
-
-ReactDOM.createRoot(document.getElementById('react-root')).render(
+ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <RoomsView />
   </React.StrictMode>
 );
+
