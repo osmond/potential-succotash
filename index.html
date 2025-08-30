@@ -343,9 +343,12 @@
       </div>
     </div>
 
+    <div id="react-root"></div>
+
     <script src="db.js"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
     <script type="module">
       import { createIcons, icons } from 'https://unpkg.com/lucide@latest/dist/esm/lucide.js';
       window.lucideRender = () => createIcons({ icons });
