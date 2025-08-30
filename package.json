@@ -2,7 +2,8 @@
   "name": "plant-tracker-pwa",
   "private": true,
   "scripts": {
-    "build": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o tailwind.css --minify && vite build && node scripts/build-output.js",
+    "build:css": "tailwindcss -c tailwind.config.js -i src/tailwind.css -o tailwind.css --minify",
+    "build": "npm run build:css && vite build && node scripts/build-output.js",
     "dev": "vite"
   },
   "devDependencies": {

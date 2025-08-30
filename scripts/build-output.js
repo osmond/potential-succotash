@@ -29,7 +29,6 @@ const staticFiles = [
   'health.html',
   'styles.css',
   'tailwind.css',
-  'app.js',
   'db.js',
   'sw.js',
   'manifest.webmanifest',
