@@ -66,6 +66,8 @@
 
   let currentStep = 1;
   const stepData = {};
+  let taxoSuggestions = [];
+  let activeTaxo = -1;
   function showStep(n){
     currentStep = n;
     const steps = $$('#editorSteps .step');
@@ -613,14 +615,38 @@
     $$('#editorView [data-next]').forEach(btn => btn.addEventListener('click', () => showStep(Math.min(5, currentStep+1))));
     $$('#editorView [data-prev]').forEach(btn => btn.addEventListener('click', () => showStep(Math.max(1, currentStep-1))));
 
-    // Taxonomy lookup
-    document.getElementById('lookupTaxonomy').addEventListener('click', async () => {
-      const name = ($('#plantName').value || '').trim();
-      if(!name){ alert('Enter a plant name first'); return; }
-      try{
-        const suggestions = await getTaxoSuggestions(name);
-        renderTaxoSuggestions(suggestions);
-      }catch{ alert('Suggestion failed'); }
+    // Taxonomy autosuggest
+    const nameInput = document.getElementById('plantName');
+    let taxoTimer;
+    nameInput.addEventListener('input', e => {
+      clearTimeout(taxoTimer);
+      const q = e.target.value.trim();
+      if(!q){ renderTaxoSuggestions([]); return; }
+      taxoTimer = setTimeout(async () => {
+        try{
+          const suggestions = await getTaxoSuggestions(q);
+          renderTaxoSuggestions(suggestions);
+        }catch{
+          renderTaxoSuggestions([]);
+        }
+      }, 300);
+    });
+    nameInput.addEventListener('keydown', e => {
+      const host = document.getElementById('taxoResults');
+      const items = host ? host.querySelectorAll('.sugg') : [];
+      if(!items.length) return;
+      if(e.key === 'ArrowDown'){
+        e.preventDefault();
+        activeTaxo = (activeTaxo + 1) % items.length;
+        updateTaxoActive();
+      }else if(e.key === 'ArrowUp'){
+        e.preventDefault();
+        activeTaxo = (activeTaxo - 1 + items.length) % items.length;
+        updateTaxoActive();
+      }else if(e.key === 'Enter' && activeTaxo >= 0){
+        e.preventDefault();
+        items[activeTaxo].click();
+      }
     });
 
     // Location selection
@@ -710,7 +736,6 @@
 
   async function getTaxoSuggestions(name){
     const out = [];
-    // Prefer OpenAI proxy for richer suggestions if available
     try{
       if(window.OPENAI_PROXY_URL){
         const ai = await suggestWithOpenAI(name);
@@ -718,12 +743,10 @@
         else if(ai) out.push(ai);
       }
     }catch{}
-    // GBIF suggestions
     try{
       const gbif = await suggestListGBIF(name);
       gbif.forEach(x => out.push(x));
     }catch{}
-    // Deduplicate by (genus,species) or name
     const seen = new Set();
     const dedup = [];
     for(const s of out){
@@ -733,25 +756,40 @@
     return dedup.slice(0,8);
   }
 
-    function renderTaxoSuggestions(list){
-      const host = document.getElementById('taxoResults');
-      if(!host) return;
-      host.innerHTML = '';
-      if(!list || !list.length){ host.textContent = 'No suggestions.'; return; }
-      for(const s of list){
-        const chip = document.createElement('span');
-        chip.className = 'sugg';
-        const label = [s.family?`[${s.family}]`:null, [s.genus,s.species].filter(Boolean).join(' ')||s.name].filter(Boolean).join(' ');
-        chip.textContent = label;
-        chip.title = 'Click to apply';
-        chip.onclick = () => {
-          stepData.family = s.family || '';
-          stepData.genus = s.genus || '';
-          stepData.species = s.species || '';
-        };
-        host.appendChild(chip);
-      }
-    }
+  function renderTaxoSuggestions(list=[]){
+    const host = document.getElementById('taxoResults');
+    if(!host) return;
+    host.innerHTML = '';
+    host.classList.remove('show');
+    taxoSuggestions = list || [];
+    activeTaxo = -1;
+    if(!taxoSuggestions.length) return;
+    taxoSuggestions.forEach((s,i) => {
+      const chip = document.createElement('div');
+      chip.className = 'sugg';
+      const label = [s.family?`[${s.family}]`:null, [s.genus,s.species].filter(Boolean).join(' ')||s.name].filter(Boolean).join(' ');
+      chip.textContent = label;
+      chip.addEventListener('click', () => applyTaxo(i));
+      host.appendChild(chip);
+    });
+    host.classList.add('show');
+  }
+
+  function applyTaxo(i){
+    const s = taxoSuggestions[i];
+    if(!s) return;
+    stepData.family = s.family || '';
+    stepData.genus = s.genus || '';
+    stepData.species = s.species || '';
+    $('#plantName').value = [s.genus, s.species].filter(Boolean).join(' ') || s.name || '';
+    renderTaxoSuggestions([]);
+  }
+
+  function updateTaxoActive(){
+    const host = document.getElementById('taxoResults');
+    const items = host ? host.querySelectorAll('.sugg') : [];
+    items.forEach((el,i) => el.classList.toggle('active', i === activeTaxo));
+  }
 
   // Import / Export
   $('#exportBtn').addEventListener('click', async () => {

@@ -173,12 +173,9 @@
   <div class="card" id="editorSteps">
     <div class="step" data-step="1" id="stepIdentify">
       <h2 class="text-xl mb-2">Identify</h2>
-      <input id="plantName" placeholder="Plant name" class="px-3 py-2 rounded-xl border w-full mb-2" />
+      <input id="plantName" placeholder="Plant name" class="px-3 py-2 rounded-xl border w-full mb-2" autocomplete="off" />
+      <div id="taxoResults" class="taxo-suggestions mb-2"></div>
       <input id="plantPhoto" type="file" accept="image/*" capture="environment" class="mb-2" />
-      <div class="actions gap-2 mb-2">
-        <button type="button" id="lookupTaxonomy" class="btn">Lookup</button>
-      </div>
-      <div id="taxoResults" class="taxo-suggestions mb-4"></div>
       <div class="actions gap-2">
         <button type="button" class="btn" id="cancelEdit">Cancel</button>
         <button type="button" data-next class="btn primary">Next</button>
