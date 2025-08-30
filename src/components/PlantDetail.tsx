@@ -64,6 +64,10 @@ export interface PlantDetailProps {
   plant: PlantMetadata;
   hydration: HydrationStatus;
   metrics: CareMetrics;
+  /** Callback when water is added */
+  onWater?: () => void | Promise<void>;
+  /** Callback when a photo is added */
+  onPhoto?: (file: File) => void | Promise<void>;
 }
 
 const size = 120;
@@ -71,7 +75,13 @@ const stroke = 8;
 const radius = (size - stroke) / 2;
 const circumference = 2 * Math.PI * radius;
 
-export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metrics }) => {
+export const PlantDetail: React.FC<PlantDetailProps> = ({
+  plant,
+  hydration,
+  metrics,
+  onWater,
+  onPhoto,
+}) => {
   const [expanded, setExpanded] = useState(false);
   const [dashOffset, setDashOffset] = useState(circumference);
   const [photos, setPhotos] = useState<string[]>([]);
@@ -136,7 +146,11 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      await (window as any).PlantDB?.putFile(file);
+      if (onPhoto) {
+        await onPhoto(file);
+      } else {
+        await (window as any).PlantDB?.putFile(file);
+      }
       const url = URL.createObjectURL(file);
       setPhotos((p) => [...p, url]);
     } finally {
@@ -157,7 +171,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
     setSuggestions((s) => s.filter((sg) => sg.id !== id));
   };
 
-  const handleAddWater = () => {
+  const handleAddWater = async () => {
     const now = new Date().toISOString();
     setHydrationState((h) => ({
       ...h,
@@ -165,6 +179,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
       lastWatered: now,
     }));
     setHistoryState((h) => [...h, { type: "water", at: now }]);
+    if (onWater) await onWater();
   };
 
   const handleAddFertilizer = () => {
