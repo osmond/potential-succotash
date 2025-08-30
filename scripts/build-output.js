@@ -7,6 +7,15 @@ const path = require('path');
 
 function ensureDir(p){ fs.mkdirSync(p, { recursive: true }); }
 function cp(src, dest){ fs.copyFileSync(src, dest); }
+function copyDir(src, dest){
+  ensureDir(dest);
+  for(const entry of fs.readdirSync(src, { withFileTypes: true })){
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if(entry.isDirectory()) copyDir(srcPath, destPath);
+    else cp(srcPath, destPath);
+  }
+}
 function writeJSON(p, obj){ fs.writeFileSync(p, JSON.stringify(obj, null, 2)); }
 
 const ROOT = process.cwd();
@@ -31,6 +40,10 @@ for(const f of staticFiles){
   const src = path.join(ROOT, f);
   if(fs.existsSync(src)) cp(src, path.join(STATIC, path.basename(f)));
 }
+
+// Include Vite build output if present
+const distDir = path.join(ROOT, 'dist');
+if(fs.existsSync(distDir)) copyDir(distDir, STATIC);
 
 // Functions
 const funcs = [
