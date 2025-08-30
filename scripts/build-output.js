@@ -49,5 +49,15 @@ for(const [srcRel, outRel] of funcs){
   });
 }
 
-console.log('Build Output API packaged to .vercel/output');
+// Build Output API config (SPA fallback)
+const config = {
+  version: 3,
+  routes: [
+    { handle: 'filesystem' },
+    { src: '/(.*)', dest: '/index.html' }
+  ]
+};
+ensureDir(OUT);
+writeJSON(path.join(OUT, 'config.json'), config);
 
+console.log('Build Output API packaged to .vercel/output');
