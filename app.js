@@ -127,7 +127,32 @@
     const plan = stepData.carePlan;
     const water = plan ? `${plan.waterMl} ml (${(plan.waterMl*0.033814).toFixed(1)} oz)` : '—';
     const every = plan ? plan.intervalDays : '—';
-    sum.innerHTML = `<strong>${escapeHtml(name)}</strong><div>Water: ${water} every ${every} days</div><div>Pot: ${stepData.potSizeIn || ''} in</div>`;
+    const pot = stepData.potSizeIn ? `${parseFloat(stepData.potSizeIn).toFixed(1).replace(/\.0$/,'')} in` : '—';
+    const location = stepData.location || '—';
+    const soil = stepData.soilType || '—';
+    const drain = stepData.hasDrain ? 'drainage' : 'no drain';
+    const photo = photoObjectURL ? `<img src="${photoObjectURL}" alt="${escapeHtml(name)}" class="object-cover w-full h-full"/>` : '';
+    sum.innerHTML = `
+      <article class="rounded-xl border p-3 bg-[color:var(--panel)] border-[color:var(--border)] flex flex-col gap-2">
+        <div class="w-full aspect-video rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] overflow-hidden cursor-pointer" data-step="1">${photo}</div>
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="name font-semibold">${escapeHtml(name)}</div>
+            <div class="species text-sm text-[color:var(--muted)]">${escapeHtml(taxonLine(stepData))}</div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <span class="pill cursor-pointer" data-step="4">Water ${water} every ${every} days</span>
+          <span class="pill cursor-pointer" data-step="3">Pot ${pot}</span>
+          <span class="pill cursor-pointer" data-step="2">${escapeHtml(location)}</span>
+          <span class="pill cursor-pointer" data-step="3">Soil ${escapeHtml(soil)}</span>
+          <span class="pill cursor-pointer" data-step="3">${drain}</span>
+        </div>
+      </article>`;
+    sum.querySelectorAll('[data-step]').forEach(el => el.addEventListener('click', e => {
+      const step = Number(el.getAttribute('data-step'));
+      if(step) showStep(step);
+    }));
   }
 
   // Views
