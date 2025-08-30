@@ -1040,7 +1040,7 @@
         onWater: async () => {
           plant.lastWatered = todayISO();
           plant.history = plant.history || [];
-          plant.history.push({ type: 'water', at: todayISO() });
+          plant.history.push({ type: 'water', at: todayISO(), amount: plant.carePlan?.waterMl });
           await PlantDB.put(plant);
           render();
         },
