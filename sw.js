@@ -1,10 +1,13 @@
-const CACHE = 'plant-tracker-v4';
+const CACHE = 'plant-tracker-v5';
 const ASSETS = [
   '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/db.js',
+  'index.html',
+  'styles.css',
+  'tailwind.css',
+  'app.js',
+  'db.js',
+  'health.html',
+  'manifest.webmanifest',
 ];
 
 self.addEventListener('install', (e) => {
@@ -30,7 +33,22 @@ self.addEventListener('fetch', (e) => {
       fetch(req).then(resp => {
         const copy = resp.clone(); caches.open(CACHE).then(c => c.put(req, copy));
         return resp;
-      }).catch(() => caches.match(req).then(r => r || caches.match('/index.html')))
+      }).catch(() => caches.match(req).then(r => r || caches.match('index.html')))
+    );
+    return;
+  }
+  const url = new URL(req.url);
+  const isStatic = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+  if(isStatic){
+    // Stale-while-revalidate for JS/CSS
+    e.respondWith(
+      caches.match(req).then(cached => {
+        const fetchPromise = fetch(req).then(resp => {
+          const copy = resp.clone(); caches.open(CACHE).then(c => c.put(req, copy));
+          return resp;
+        }).catch(() => cached);
+        return cached || fetchPromise;
+      })
     );
     return;
   }
@@ -41,4 +59,10 @@ self.addEventListener('fetch', (e) => {
       return resp;
     }))
   );
+});
+
+self.addEventListener('message', (event) => {
+  if(event.data === 'SKIP_WAITING'){
+    self.skipWaiting();
+  }
 });

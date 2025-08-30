@@ -268,6 +268,30 @@
     });
   }
 
+  // Force Update button: clears caches, asks SW to update and reloads
+  const updateBtn = document.getElementById('updateBtn');
+  if(updateBtn){
+    updateBtn.addEventListener('click', async () => {
+      showToast('Updating…');
+      try{
+        // Clear caches
+        if('caches' in window){
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        // Update SW
+        if('serviceWorker' in navigator){
+          const reg = await navigator.serviceWorker.getRegistration();
+          if(reg){
+            reg.update();
+            if(reg.waiting){ reg.waiting.postMessage('SKIP_WAITING'); }
+          }
+        }
+      }catch{}
+      setTimeout(() => location.reload(), 300);
+    });
+  }
+
   function showToast(msg){
     const t = document.getElementById('toast'); if(!t) return;
     t.textContent = msg; t.style.display = 'block';
