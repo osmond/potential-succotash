@@ -18,6 +18,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { usePlantStore } from "../state/usePlantStore";
 
 export interface PlantEvent {
   type: string;
@@ -34,6 +35,7 @@ export interface Observation {
 }
 
 export interface PlantMetadata {
+  id: string;
   name: string;
   species?: string;
   location?: string;
@@ -93,8 +95,6 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [dashOffset, setDashOffset] = useState(circumference);
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [hydrationStatus, setHydrationStatus] = useState(hydration);
   const [displayHydration, setDisplayHydration] = useState(0);
   const [dataPanelOpen, setDataPanelOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState<Record<string, boolean>>({});
@@ -118,12 +118,28 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const [fabOpen, setFabOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const plantState = usePlantStore((s) => s.plants[plant.id]);
+  const setHydration = usePlantStore((s) => s.setHydration);
+  const logWaterStore = usePlantStore((s) => s.logWater);
+  const addPhotoStore = usePlantStore((s) => s.addPhoto);
+  const addTask = usePlantStore((s) => s.addTask);
+  const completeTask = usePlantStore((s) => s.completeTask);
+  const hydrationStatus = plantState?.hydration || { level: 0 };
+  const photos = plantState?.photos || [];
+  const tasks = plantState?.tasks || [];
+
   const toggleInfo = (key: string) =>
     setInfoOpen((o) => ({ ...o, [key]: !o[key] }));
 
   useEffect(() => {
-    setHydrationStatus(hydration);
-  }, [hydration]);
+    setHydration(plant.id, hydration);
+  }, [plant.id, hydration, setHydration]);
+
+  useEffect(() => {
+    if (hydrationStatus.level < 100 && !tasks.includes("Water plant")) {
+      addTask(plant.id, "Water plant");
+    }
+  }, [plant.id, hydrationStatus.level, tasks, addTask]);
 
   useEffect(() => {
     let start: number | null = null;
@@ -190,14 +206,18 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
           }
         } catch {}
       }
-      if (!cancelled) setPhotos(urls);
+      if (!cancelled && (!plantState || plantState.photos.length === 0)) {
+        urls.forEach((u) => addPhotoStore(plant.id, u));
+      }
     }
-    load();
+    if (!plantState || plantState.photos.length === 0) {
+      load();
+    }
     return () => {
       cancelled = true;
       photos.forEach((u) => URL.revokeObjectURL(u));
     };
-  }, [plant.observations]);
+  }, [plant.observations, plantState, addPhotoStore, plant.id, photos]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -209,7 +229,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
         await (window as any).PlantDB?.putFile(file);
       }
       const url = URL.createObjectURL(file);
-      setPhotos((p) => [...p, url]);
+      addPhotoStore(plant.id, url);
     } finally {
       e.target.value = "";
     }
@@ -218,11 +238,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const applySuggestion = async (id: string) => {
     const now = new Date().toISOString();
     if (id === "mark-watered") {
-      setHydrationStatus((h) => ({
-        ...h,
-        level: Math.min(h.level + 10, 100),
-        lastWatered: now,
-      }));
+      logWaterStore(plant.id, Math.min(hydrationStatus.level + 10, 100));
       setHistoryState((h) => [...h, { type: "water", at: now }]);
       if (onWater) await onWater();
     } else if (id === "adjust-care") {
@@ -234,11 +250,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
 
   const handleAddWater = async () => {
     const now = new Date().toISOString();
-    setHydrationStatus((h) => ({
-      ...h,
-      level: Math.min(h.level + 10, 100),
-      lastWatered: now,
-    }));
+    logWaterStore(plant.id, Math.min(hydrationStatus.level + 10, 100));
     setHistoryState((h) => [...h, { type: "water", at: now }]);
     if (onWater) await onWater();
   };
@@ -380,6 +392,25 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
           </div>
         )}
       </div>
+
+      {tasks.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-semibold mb-2">Tasks</h3>
+          <ul className="space-y-2">
+            {tasks.map((t, i) => (
+              <li key={i} className="flex items-center justify-between">
+                <span>{t}</span>
+                <button
+                  onClick={() => completeTask(plant.id, i)}
+                  className="text-xs text-green-600"
+                >
+                  Done
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {suggestions.length > 0 && (
         <div className="mt-4">
