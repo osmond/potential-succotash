@@ -67,8 +67,8 @@
             </div>
             <select id="taskTypeFilter" class="px-2 py-2 rounded-xl border" style="border-color: var(--border)">
               <option value="all">All</option>
-              <option value="water">Watering</option>
-              <option value="other">Other</option>
+              <option value="water">💧 Watering</option>
+              <option value="other">⋯ Other</option>
             </select>
             <select id="taskWindowFilter" class="px-2 py-2 rounded-xl border" style="border-color: var(--border)">
               <option value="7">7 days</option>
@@ -81,6 +81,14 @@
               <span>Only overdue</span>
             </label>
             <button id="resetFilters" class="btn px-3 py-2 rounded-xl">Reset</button>
+            <button id="legendToggle" class="btn px-3 py-2 rounded-xl" title="Show legend">Legend</button>
+          </div>
+        </div>
+
+        <div id="legend" class="card" style="display:none; margin-bottom:8px">
+          <div class="muted text-sm">Icons
+            <div>💧 Water • 🧪 Fertilize • 🪣 Repot • ✂️ Prune • 🔍 Inspect • 💨 Mist</div>
+            <div>🌵 cactus / 🪴 aroid/generic • 🏠 indoor • 🌤 outdoor • N/E/S/W exposure</div>
           </div>
         </div>
 

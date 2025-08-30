@@ -260,6 +260,13 @@
   if(typeSel) typeSel.addEventListener('change', async () => { const s=getSettings(); s.taskType=typeSel.value; setSettings(s); await renderList(); showToast('Filters saved'); });
   if(winSel) winSel.addEventListener('change', async () => { const s=getSettings(); s.taskWindow=Number(winSel.value); setSettings(s); await renderList(); showToast('Filters saved'); });
   if(onlyOverdue) onlyOverdue.addEventListener('change', async () => { const s=getSettings(); s.onlyOverdue=!!onlyOverdue.checked; setSettings(s); await renderList(); showToast('Filters saved'); });
+  const legendToggle = document.getElementById('legendToggle');
+  if(legendToggle){
+    legendToggle.addEventListener('click', () => {
+      const el = document.getElementById('legend');
+      if(!el) return; el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none';
+    });
+  }
 
   function showToast(msg){
     const t = document.getElementById('toast'); if(!t) return;

@@ -67,13 +67,9 @@ main{ padding: 16px; max-width: 900px; margin: 0 auto }
 .hint{ color:var(--muted); font-size:.95rem }
 
 .plant-list{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px }
-.plant-card{
-  background: var(--panel);
-  border:1px solid var(--border); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px; min-height: 140px;
-}
-.plant-card .cover{ width:100%; aspect-ratio: 16 / 9; border-radius:10px; background-size: cover; background-position:center; background-color: var(--panel-2); border:1px solid var(--border) }
-.plant-card .thumbs{ display:flex; gap:6px }
-.plant-card .thumbs img{ width:40px; height:40px; object-fit:cover; border-radius:8px; border:1px solid var(--border) }
+.cover{ background-size: cover; background-position:center }
+.thumbs{ display:flex; gap:6px }
+.thumbs img{ width:40px; height:40px; object-fit:cover; border-radius:8px; border:1px solid var(--border) }
 .plant-card .header{ display:flex; align-items:center; justify-content:space-between; gap:.5rem }
 .env-summary{ color: var(--muted); font-size:.9rem; margin-top:2px }
 .detail .stats .pill{ margin-right:.25rem }
