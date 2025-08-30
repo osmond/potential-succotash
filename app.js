@@ -130,6 +130,7 @@
       list.appendChild(li);
       enrichCardWithMedia(li, plant);
     }
+    if(window.lucideRender) window.lucideRender();
   }
 
   async function renderTasks(plants){
@@ -198,6 +199,7 @@
         const li = document.createElement('li'); li.innerHTML = taskCardHTML(it); bindTaskCard(li, it); upHost.appendChild(li);
       }
     }
+    if(window.lucideRender) window.lucideRender();
   }
 
   function taskCardHTML(it){
@@ -205,12 +207,12 @@
     const rel = humanDue(it.due);
     const p = it.plant;
     const vol = waterPill(p);
-    const icon = taskIcon(it.type);
+    const iconEl = taskIcon(it.type);
     return `
       <article class="rounded-xl border p-3 bg-[color:var(--panel)] border-[color:var(--border)] flex flex-col gap-2">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <div class="font-semibold"><span title="${escapeHtml(capitalize(it.type))}">${icon}</span> ${escapeHtml(it.title)}</div>
+            <div class="font-semibold"><span title="${escapeHtml(capitalize(it.type))}">${iconEl}</span> ${escapeHtml(it.title)}</div>
             <div class="species text-sm text-[color:var(--muted)]">${escapeHtml(taxonLine(p))}</div>
           </div>
           <div class="pill ${badge}">${escapeHtml(rel)}</div>
@@ -772,6 +774,7 @@
     }
     // Chart
     drawHistory($('#detailChart'), plant);
+    if(window.lucideRender) window.lucideRender();
   }
 
   function drawHistory(canvas, plant){
@@ -932,11 +935,15 @@
     return (parts || '—') + tuneStr;
   }
   function envChip(p){
-    const soilIcon = p.soilType === 'cactus' ? '🌵' : (p.soilType === 'aroid' ? '🪴' : '🪴');
-    const whereIcon = p.inout === 'outdoor' ? '🌤' : '🏠';
+    const soil = p.soilType === 'cactus' ? 'cactus' : 'sprout';
+    const where = p.inout === 'outdoor' ? 'sun' : 'home';
     const exp = p.exposure || '';
     const title = `Soil: ${p.soilType||'generic'}; ${p.inout||'indoor'}${exp?(' • '+exp):''}`;
-    return `<span class="pill" title="${escapeHtml(title)}">${soilIcon} ${whereIcon}${exp?(' '+exp):''}</span>`;
+    return `<span class="pill" title="${escapeHtml(title)}">${icon(soil)} ${icon(where)}${exp?(' '+escapeHtml(exp)):''}</span>`;
+  }
+
+  function icon(name){
+    return `<i data-lucide="${name}"></i>`;
   }
 
   // Weather pill in Details header
