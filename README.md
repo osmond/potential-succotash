@@ -16,13 +16,13 @@ Nerdy and beautiful plant tracker that works on phone and laptop.
    ```bash
    npm run dev
    ```
-   Serves the app on `http://localhost:5173` (or `PORT` if set) and auto‑opens `health.html` in your browser.
-   React components such as `RoomsView` in `src/` are the entry point; edit components and Vite hot‑reloads the page.
-3. **Build for production**
-   ```bash
-   npm run build
-   ```
-   Generates optimized assets in `.vercel/output`.
+   Runs the Vite dev server at `http://localhost:5173` (or `PORT` if set). Open `index.html` or `health.html` in your browser.
+3. **Iterate**
+   - Edit any `.html`, `.css`, or `.js` file; refresh the browser to see changes.
+   - Run `npm run build` if you need to regenerate `tailwind.css`.
+
+> **Quick start (no dev server):** open `index.html` directly in a browser for simple tweaks.
+
 
 ## Local Build
 
