@@ -38,6 +38,16 @@ Nerdy and beautiful plant tracker that works on phone and laptop.
 3. **Open the built files**
    After the build finishes, open `health.html` in a browser to verify the local build.
 
+## Tests
+
+Currently there are no automated tests. Run the placeholder test script with:
+
+```bash
+npm test
+```
+
+This will print "No tests yet" until real tests are added.
+
 ## Current Features
 
 - Add/edit plants with species, light level, pot size, and base watering interval
