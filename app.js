@@ -96,7 +96,29 @@
       const bar = prog.querySelector('.bar');
       if(bar) bar.style.width = pct + '%';
     }
+    if(n === 4) generateCarePlan();
     if(n === 5) updateConfirm();
+  }
+  async function generateCarePlan(){
+    const name = $('#plantName').value.trim();
+    if(!name){ alert('Enter a plant name first'); return; }
+    if(!window.OPENAI_PLAN_URL){ alert('AI plan URL not configured.'); return; }
+    const potIn = stepData.potSizeIn || 6;
+    const details = document.getElementById('carePlanDetails');
+    if(details) details.innerHTML = '<div class="flex justify-center p-4"><div class="w-6 h-6 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div></div>';
+    try{
+      const r = await fetch(window.OPENAI_PLAN_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name, potIn }) });
+      if(!r.ok) throw new Error('plan');
+      const plan = await r.json();
+      stepData.family = plan.family || stepData.family;
+      stepData.genus = plan.genus || stepData.genus;
+      stepData.species = plan.species || stepData.species;
+      stepData.carePlan = { intervalDays: plan.baseIntervalDays || plan.intervalDays || 7, waterMl: plan.waterMl || 250, fertilizer: plan.fertilizer || '', repot: plan.repot || '' };
+      const oz = (stepData.carePlan.waterMl*0.033814).toFixed(1);
+      if(details) details.innerHTML = `Water ${stepData.carePlan.waterMl} ml (${oz} oz) every ${stepData.carePlan.intervalDays} days<br>Fertilizer: ${escapeHtml(stepData.carePlan.fertilizer || '—')}<br>Repot: ${escapeHtml(stepData.carePlan.repot || '—')}`;
+    }catch{
+      if(details) details.textContent = 'Failed to generate care plan';
+    }
   }
   function updateConfirm(){
     const sum = $('#confirmSummary');
@@ -784,28 +806,6 @@
       });
     });
     document.getElementById('hasDrain').addEventListener('change', e => { stepData.hasDrain = e.target.checked; });
-
-    // Care plan generation
-    document.getElementById('genCarePlan').addEventListener('click', async () => {
-      const name = $('#plantName').value.trim();
-      if(!name){ alert('Enter a plant name first'); return; }
-      if(!window.OPENAI_PLAN_URL){ alert('AI plan URL not configured.'); return; }
-      const potIn = stepData.potSizeIn || 6;
-      const btn = document.getElementById('genCarePlan');
-      btn.disabled = true; btn.textContent = 'Generating…';
-      try{
-        const r = await fetch(window.OPENAI_PLAN_URL, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name, potIn }) });
-        if(!r.ok) throw new Error('plan');
-        const plan = await r.json();
-        stepData.family = plan.family || stepData.family;
-        stepData.genus = plan.genus || stepData.genus;
-        stepData.species = plan.species || stepData.species;
-        stepData.carePlan = { intervalDays: plan.baseIntervalDays || plan.intervalDays || 7, waterMl: plan.waterMl || 250 };
-        const oz = (stepData.carePlan.waterMl*0.033814).toFixed(1);
-        document.getElementById('carePlanDetails').innerHTML = `Water ${stepData.carePlan.waterMl} ml (${oz} oz) every ${stepData.carePlan.intervalDays} days<br>Pot: ${stepData.potSizeIn} in`;
-      }catch{ alert('Failed to generate care plan'); }
-      finally{ btn.disabled = false; btn.textContent = 'Generate Plan'; }
-    });
 
     // Final add action
     document.getElementById('addSpecimen').addEventListener('click', async () => {
