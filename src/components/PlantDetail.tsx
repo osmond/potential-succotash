@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
   Droplet,
-  Sun,
-  Thermometer,
   ChevronDown,
   ChevronUp,
   FlaskConical,
@@ -10,6 +8,7 @@ import {
   Activity,
   Plus,
   X,
+  Info,
 } from "lucide-react";
 import {
   BarChart,
@@ -58,6 +57,14 @@ export interface CareMetrics {
   temperature?: number;
   /** Relative humidity percentage */
   humidity?: number;
+  /** Vapor pressure deficit (kPa) */
+  vpd?: number;
+  /** Reference evapotranspiration (mm/day) */
+  eto?: number;
+  /** Soil moisture percentage */
+  soilMoisture?: number;
+  /** Average watering interval in days */
+  avgInterval?: number;
 }
 
 export interface PlantDetailProps {
@@ -85,7 +92,10 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const [expanded, setExpanded] = useState(false);
   const [dashOffset, setDashOffset] = useState(circumference);
   const [photos, setPhotos] = useState<string[]>([]);
-  const [hydrationState, setHydrationState] = useState(hydration);
+  const [hydrationStatus, setHydrationStatus] = useState(hydration);
+  const [displayHydration, setDisplayHydration] = useState(0);
+  const [dataPanelOpen, setDataPanelOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState<Record<string, boolean>>({});
   const [historyState, setHistoryState] = useState<PlantEvent[]>(plant.history || []);
   const [suggestions, setSuggestions] = useState(
     [
@@ -107,14 +117,30 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
     ? "opacity-100 translate-y-0"
     : "opacity-0 translate-y-4 pointer-events-none";
 
-  useEffect(() => {
-    const progress = Math.min(Math.max(hydrationState.level, 0), 100) / 100;
-    setDashOffset(circumference - progress * circumference);
-  }, [hydrationState.level]);
+  const toggleInfo = (key: string) =>
+    setInfoOpen((o) => ({ ...o, [key]: !o[key] }));
 
   useEffect(() => {
-    setHydrationState(hydration);
+    setHydrationStatus(hydration);
   }, [hydration]);
+
+  useEffect(() => {
+    let start: number | null = null;
+    const from = displayHydration;
+    const to = Math.min(Math.max(hydrationStatus.level, 0), 100);
+    const duration = 700;
+
+    const animate = (timestamp: number) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const value = Math.round(from + (to - from) * progress);
+      setDisplayHydration(value);
+      setDashOffset(circumference - (value / 100) * circumference);
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+
+    requestAnimationFrame(animate);
+  }, [hydrationStatus.level]);
 
   useEffect(() => {
     setHistoryState(plant.history || []);
@@ -161,7 +187,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
   const handleSuggestion = (id: string) => {
     const now = new Date().toISOString();
     if (id === "increase-water") {
-      setHydrationState((h) => ({
+      setHydrationStatus((h) => ({
         ...h,
         level: Math.min(h.level + 10, 100),
         lastWatered: now,
@@ -173,7 +199,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
 
   const handleAddWater = async () => {
     const now = new Date().toISOString();
-    setHydrationState((h) => ({
+    setHydrationStatus((h) => ({
       ...h,
       level: Math.min(h.level + 10, 100),
       lastWatered: now,
@@ -191,10 +217,31 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
     fileInputRef.current?.click();
   };
 
-  const stats = [
-    { icon: Sun, label: "Sun", value: metrics.sunlight ? `${metrics.sunlight}h` : "--" },
-    { icon: Thermometer, label: "Temp", value: metrics.temperature ? `${metrics.temperature}°C` : "--" },
-    { icon: Droplet, label: "Humidity", value: metrics.humidity ? `${metrics.humidity}%` : "--" },
+  const metricDetails = [
+    {
+      key: "vpd",
+      label: "VPD",
+      value: metrics.vpd ? `${metrics.vpd} kPa` : "--",
+      tip: "Vapor pressure deficit between air and leaf",
+    },
+    {
+      key: "eto",
+      label: "ET₀",
+      value: metrics.eto ? `${metrics.eto} mm/day` : "--",
+      tip: "Reference evapotranspiration rate",
+    },
+    {
+      key: "soil",
+      label: "Soil moisture",
+      value: metrics.soilMoisture ? `${metrics.soilMoisture}%` : "--",
+      tip: "Volumetric water content of soil",
+    },
+    {
+      key: "avg",
+      label: "Avg interval",
+      value: metrics.avgInterval ? `${metrics.avgInterval}d` : "--",
+      tip: "Average days between watering",
+    },
   ];
 
   const timeline = historyState
@@ -229,50 +276,77 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
         </div>
       </div>
 
-      <div className="relative mx-auto mt-6 w-[120px] h-[120px]">
-        <svg
-          width={size}
-          height={size}
-          className="transform -rotate-90"
-          viewBox={`0 0 ${size} ${size}`}
-        >
-          <circle
-            stroke="currentColor"
-            className="text-gray-200"
-            strokeWidth={stroke}
-            fill="transparent"
-            r={radius}
-            cx={size / 2}
-            cy={size / 2}
-          />
-          <circle
-            stroke="currentColor"
-            className="text-blue-500 transition-all duration-700 ease-out"
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            fill="transparent"
-            r={radius}
-            cx={size / 2}
-            cy={size / 2}
-            style={{
-              strokeDasharray: `${circumference} ${circumference}`,
-              strokeDashoffset: dashOffset,
-            }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xl font-bold">{hydrationState.level}%</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mt-6">
-        {stats.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="flex flex-col items-center">
-            <Icon className="w-6 h-6 mb-1" />
-            <span className="text-sm font-semibold">{value}</span>
-            <span className="text-xs text-gray-500">{label}</span>
+      <div className="mt-6 flex flex-col items-center">
+        <div className="relative w-[120px] h-[120px]">
+          <svg
+            width={size}
+            height={size}
+            className="transform -rotate-90"
+            viewBox={`0 0 ${size} ${size}`}
+          >
+            <circle
+              stroke="currentColor"
+              className="text-gray-200"
+              strokeWidth={stroke}
+              fill="transparent"
+              r={radius}
+              cx={size / 2}
+              cy={size / 2}
+            />
+            <circle
+              stroke="currentColor"
+              className="text-blue-500"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              fill="transparent"
+              r={radius}
+              cx={size / 2}
+              cy={size / 2}
+              style={{
+                strokeDasharray: `${circumference} ${circumference}`,
+                strokeDashoffset: dashOffset,
+                transition: "stroke-dashoffset 0.7s ease-out",
+              }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xl font-bold">{displayHydration}%</span>
           </div>
-        ))}
+        </div>
+
+        <button
+          onClick={() => setDataPanelOpen((o) => !o)}
+          className="mt-4 flex items-center text-sm text-green-600"
+        >
+          {dataPanelOpen ? (
+            <ChevronUp className="w-4 h-4 mr-1" />
+          ) : (
+            <ChevronDown className="w-4 h-4 mr-1" />
+          )}
+          {dataPanelOpen ? "Hide data" : "Show data"}
+        </button>
+
+        {dataPanelOpen && (
+          <div className="mt-4 w-full space-y-3 text-sm">
+            {metricDetails.map((m) => (
+              <div key={m.key} className="flex flex-col">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{m.label}</span>
+                  <div className="flex items-center space-x-1">
+                    <span>{m.value}</span>
+                    <Info
+                      className="w-4 h-4 text-gray-400 cursor-pointer"
+                      onClick={() => toggleInfo(m.key)}
+                    />
+                  </div>
+                </div>
+                {infoOpen[m.key] && (
+                  <p className="mt-1 text-xs text-gray-500">{m.tip}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {suggestions.map((s) => (
@@ -306,9 +380,9 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({
               <span className="font-medium">Location:</span> {plant.location}
             </p>
           )}
-          {hydrationState.lastWatered && (
+          {hydrationStatus.lastWatered && (
             <p>
-              <span className="font-medium">Last watered:</span> {hydrationState.lastWatered}
+              <span className="font-medium">Last watered:</span> {hydrationStatus.lastWatered}
             </p>
           )}
 
