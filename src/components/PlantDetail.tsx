@@ -1,11 +1,45 @@
 import React, { useEffect, useState } from "react";
-import { Droplet, Sun, Thermometer, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Droplet,
+  Sun,
+  Thermometer,
+  ChevronDown,
+  ChevronUp,
+  FlaskConical,
+  Camera,
+  Activity,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+export interface PlantEvent {
+  type: string;
+  at: string;
+  amount?: number;
+}
+
+export interface Observation {
+  id: string;
+  at: string;
+  type: "photo" | "note";
+  fileId?: string;
+  note?: string;
+}
 
 export interface PlantMetadata {
   name: string;
   species?: string;
   location?: string;
   imageUrl?: string;
+  history?: PlantEvent[];
+  observations?: Observation[];
 }
 
 export interface HydrationStatus {
@@ -38,17 +72,72 @@ const circumference = 2 * Math.PI * radius;
 export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metrics }) => {
   const [expanded, setExpanded] = useState(false);
   const [dashOffset, setDashOffset] = useState(circumference);
+  const [photos, setPhotos] = useState<string[]>([]);
 
   useEffect(() => {
     const progress = Math.min(Math.max(hydration.level, 0), 100) / 100;
     setDashOffset(circumference - progress * circumference);
   }, [hydration.level]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const obs = plant.observations?.filter((o) => o.type === "photo" && o.fileId) || [];
+      const urls: string[] = [];
+      for (const o of obs) {
+        try {
+          const blob = await (window as any).PlantDB?.getFile(o.fileId);
+          if (blob) {
+            urls.push(URL.createObjectURL(blob));
+          }
+        } catch {}
+      }
+      if (!cancelled) setPhotos(urls);
+    }
+    load();
+    return () => {
+      cancelled = true;
+      photos.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [plant.observations]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await (window as any).PlantDB?.putFile(file);
+      const url = URL.createObjectURL(file);
+      setPhotos((p) => [...p, url]);
+    } finally {
+      e.target.value = "";
+    }
+  };
+
   const stats = [
     { icon: Sun, label: "Sun", value: metrics.sunlight ? `${metrics.sunlight}h` : "--" },
     { icon: Thermometer, label: "Temp", value: metrics.temperature ? `${metrics.temperature}°C` : "--" },
     { icon: Droplet, label: "Humidity", value: metrics.humidity ? `${metrics.humidity}%` : "--" },
   ];
+
+  const timeline = (plant.history || [])
+    .slice()
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const eventIcons: Record<string, React.ComponentType<any>> = {
+    water: Droplet,
+    fertilize: FlaskConical,
+    observe: Camera,
+  };
+
+  const wateringData = (plant.history || [])
+    .filter((h) => h.type === "water" && typeof h.amount === "number")
+    .slice(-7)
+    .map((h) => ({
+      date: new Date(h.at).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      amount: h.amount as number,
+    }));
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6 max-w-sm mx-auto">
@@ -121,7 +210,7 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
       </button>
 
       {expanded && (
-        <div className="mt-4 space-y-2 text-sm text-gray-600">
+        <div className="mt-4 space-y-4 text-sm text-gray-600">
           {plant.location && (
             <p>
               <span className="font-medium">Location:</span> {plant.location}
@@ -132,6 +221,63 @@ export const PlantDetail: React.FC<PlantDetailProps> = ({ plant, hydration, metr
               <span className="font-medium">Last watered:</span> {hydration.lastWatered}
             </p>
           )}
+
+          {wateringData.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">Watering</h3>
+              <ResponsiveContainer width="100%" height={150}>
+                <BarChart data={wateringData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="amount" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {timeline.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">Care Timeline</h3>
+              <ul className="space-y-2">
+                {timeline.map((h, i) => {
+                  const Icon = eventIcons[h.type] || Activity;
+                  return (
+                    <li key={i} className="flex items-center">
+                      <Icon className="w-4 h-4 mr-2" />
+                      <span className="capitalize">{h.type}</span>
+                      <span className="ml-auto text-xs text-gray-500">
+                        {new Date(h.at).toLocaleDateString()}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <div>
+            <h3 className="font-semibold mb-2">Observations</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {photos.map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  className="w-full h-24 object-cover rounded"
+                />
+              ))}
+              <label className="w-full h-24 bg-gray-100 flex items-center justify-center rounded cursor-pointer">
+                <span className="text-gray-400 text-2xl">+</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                />
+              </label>
+            </div>
+          </div>
         </div>
       )}
     </div>
