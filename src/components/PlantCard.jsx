@@ -1,68 +1,33 @@
-import React, { useState, useRef } from 'react';
-import { useSwipeable } from 'react-swipeable';
-import { Droplet, FlaskConical, Camera } from 'lucide-react';
+import React from 'react';
+import HydrationRing from './HydrationRing.jsx';
 
-export default function PlantCard({ plant }) {
-  const [showActions, setShowActions] = useState(false);
-  const pressTimer = useRef(null);
-
-  const handlers = useSwipeable({
-    onSwipedLeft: () => setShowActions(true),
-    onSwipedRight: () => setShowActions(false),
-  });
-
-  const startPress = () => {
-    pressTimer.current = setTimeout(() => setShowActions(true), 600);
-  };
-
-  const endPress = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
+export default function PlantCard({ plant, hydration, compact = false, children }) {
+  const ringSize = compact ? 64 : 120;
+  const imageSize = compact ? 'w-12 h-12' : 'w-16 h-16';
+  const titleSize = compact ? 'text-lg' : 'text-xl';
+  const maxWidth = compact ? 'max-w-xs' : 'max-w-sm';
 
   return (
-    <div
-      {...handlers}
-      onTouchStart={startPress}
-      onTouchEnd={endPress}
-      onMouseDown={startPress}
-      onMouseUp={endPress}
-      className="relative bg-white rounded shadow p-4"
-    >
-      <div className="flex items-center">
-        {plant.image && (
+    <div className={`bg-white rounded-xl shadow-md p-6 ${maxWidth} mx-auto`}>
+      <div className="flex items-center space-x-4">
+        {plant?.imageUrl && (
           <img
-            src={plant.image}
+            src={plant.imageUrl}
             alt={plant.name}
-            className="w-12 h-12 rounded-full object-cover mr-4"
+            className={`${imageSize} rounded-lg object-cover`}
           />
         )}
         <div>
-          <h3 className="font-semibold">{plant.name}</h3>
-          {plant.species && (
-            <p className="text-sm text-gray-500">{plant.species}</p>
-          )}
+          <h2 className={`${titleSize} font-semibold`}>{plant?.name}</h2>
+          {plant?.species && <p className="text-sm text-gray-500">{plant.species}</p>}
         </div>
       </div>
 
-      {showActions && (
-        <div className="absolute inset-0 bg-white/90 flex items-center justify-around" onClick={() => setShowActions(false)}>
-          <button className="flex flex-col items-center text-blue-600" onClick={(e) => e.stopPropagation()}>
-            <Droplet className="w-6 h-6" />
-            <span className="text-xs mt-1">Water</span>
-          </button>
-          <button className="flex flex-col items-center text-green-600" onClick={(e) => e.stopPropagation()}>
-            <FlaskConical className="w-6 h-6" />
-            <span className="text-xs mt-1">Fertilize</span>
-          </button>
-          <button className="flex flex-col items-center text-purple-600" onClick={(e) => e.stopPropagation()}>
-            <Camera className="w-6 h-6" />
-            <span className="text-xs mt-1">Photo</span>
-          </button>
-        </div>
-      )}
+      <div className="mt-6 flex flex-col items-center">
+        <HydrationRing percentage={hydration} size={ringSize} />
+        {children}
+      </div>
+
     </div>
   );
 }
